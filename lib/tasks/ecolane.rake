@@ -50,9 +50,10 @@ namespace :ecolane do
     poi_total_duplicate_count = 0
     total_pois_loaded = 0
     
-    new_poi_names_set = Set.new
-
     systems.each do |system|
+
+      new_poi_names_set = Set.new
+
       services = services_by_system[system]
       agencies = services.map(&:agency).uniq
       services.each do |service|
