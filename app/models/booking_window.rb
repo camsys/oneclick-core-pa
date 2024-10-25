@@ -14,8 +14,8 @@ class BookingWindow < ApplicationRecord
   def self.active_service_days_up_to(end_date)
     # Find all service schedules active up to the given end_date
     ServiceSubSchedule
-      .where("day <= ?", end_date.wday)
-      .or(ServiceSubSchedule.where(calendar_date: Date.current..end_date))
+      .where("day IN (?) OR calendar_date BETWEEN ? AND ?", 
+             (0..6).to_a, Date.current, end_date)
       .distinct
       .pluck(:day)
       .size
