@@ -11,6 +11,64 @@ module OTP
     attr_accessor :base_url
     attr_accessor :version
 
+    def plan_via_graphql(from, to, trip_datetime, arrive_by, modes)
+      query = <<-GRAPHQL
+        query($from: InputCoordinates!, $to: InputCoordinates!, $time: String!, $date: String!, $arriveBy: Boolean!, $modes: [Mode!]) {
+          plan(
+            from: $from,
+            to: $to,
+            time: $time,
+            date: $date,
+            arriveBy: $arriveBy,
+            transportModes: $modes
+          ) {
+            itineraries {
+              startTime
+              endTime
+              legs {
+                mode
+                startTime
+                endTime
+                from { name lat lon }
+                to { name lat lon }
+              }
+            }
+          }
+        }
+      GRAPHQL
+    
+      variables = {
+        from: { lat: from[0], lon: from[1] },
+        to: { lat: to[0], lon: to[1] },
+        time: trip_datetime.strftime("%-I:%M%p"),
+        date: trip_datetime.strftime("%Y-%m-%d"),
+        arriveBy: arrive_by,
+        modes: modes.map { |m| { mode: m.upcase } }
+      }
+    
+      response = execute_graphql(query, variables)
+      parse_response(response)
+    end
+
+    def execute_graphql(query, variables)
+      uri = URI.parse(@base_url + '/graphql')
+      http = Net::HTTP.new(uri.host, uri.port)
+      request = Net::HTTP::Post.new(uri.path, { 'Content-Type' => 'application/json' })
+      request.body = { query: query, variables: variables }.to_json
+    
+      response = http.request(request)
+      JSON.parse(response.body)
+    end
+    
+    def parse_response(response)
+      if response['data'] && response['data']['plan']
+        response['data']['plan']['itineraries'].map { |i| OTP::OTPItinerary.new(i) }
+      else
+        raise "GraphQL Error: #{response['errors']}"
+      end
+    end
+    
+
     def initialize(base_url="", version="v1")
       @base_url = base_url
       @version = version
