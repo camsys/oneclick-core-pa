@@ -53,12 +53,14 @@ module OTP
     def execute_graphql(query, variables)
       uri = URI.parse(@base_url + '/graphql')
       http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = (uri.scheme == 'https')
+    
       request = Net::HTTP::Post.new(uri.path, { 'Content-Type' => 'application/json' })
       request.body = { query: query, variables: variables }.to_json
     
       response = http.request(request)
       JSON.parse(response.body)
-    end
+    end    
     
     def parse_response(response)
       if response['data'] && response['data']['plan']
