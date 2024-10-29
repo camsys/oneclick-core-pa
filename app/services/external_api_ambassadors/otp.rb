@@ -25,10 +25,12 @@ module OTP
             itineraries {
               startTime
               endTime
+              duration
               legs {
                 mode
                 startTime
                 endTime
+                distance
                 from { name lat lon }
                 to { name lat lon }
               }
@@ -40,18 +42,18 @@ module OTP
       variables = {
         from: { lat: from[0], lon: from[1] },
         to: { lat: to[0], lon: to[1] },
-        time: trip_datetime.strftime("%-I:%M%p"),
+        time: trip_datetime.strftime("%H:%M:%S"),
         date: trip_datetime.strftime("%Y-%m-%d"),
         arriveBy: arrive_by,
         modes: modes.map { |m| { mode: m.upcase } }
       }
     
-      response = execute_graphql(query, variables)
-      parse_response(response)
-    end
+      execute_graphql(query, variables)
+    end    
 
     def execute_graphql(query, variables)
       uri = URI.parse(@base_url + '/graphql')
+    
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = (uri.scheme == 'https')
     
@@ -60,7 +62,9 @@ module OTP
     
       response = http.request(request)
       JSON.parse(response.body)
-    end    
+    rescue JSON::ParserError => e
+      raise "GraphQL Parsing Error: #{e.message}"
+    end     
     
     def parse_response(response)
       if response['data'] && response['data']['plan']
