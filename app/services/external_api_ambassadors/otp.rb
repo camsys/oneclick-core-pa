@@ -63,6 +63,54 @@ module OTP
 
     end
 
+    def plan_via_graphql(from, to, trip_datetime, arrive_by, modes)
+      query = <<-GRAPHQL
+        query($from: String!, $to: String!, $time: String!, $date: String!, $arriveBy: Boolean!, $modes: [Mode!]) {
+          plan(
+            fromPlace: $from,
+            toPlace: $to,
+            time: $time,
+            date: $date,
+            arriveBy: $arriveBy,
+            transportModes: $modes
+          ) {
+            itineraries {
+              startTime
+              endTime
+              legs {
+                mode
+                startTime
+                endTime
+                from { name lat lon }
+                to { name lat lon }
+              }
+            }
+          }
+      GRAPHQL
+
+      variables = {
+        from: "#{from[0]},#{from[1]}",
+        to: "#{to[0]},#{to[1]}",
+        time: trip_datetime.strftime("%-I:%M%p"),
+        date: trip_datetime.strftime("%Y-%m-%d"),
+        arriveBy: arrive_by,
+        modes: modes.map(&:upcase)
+      }
+
+      execute_graphql(query, variables)
+    end
+
+    def execute_graphql(query, variables)
+      uri = URI("#{@base_url}/otp/routers/default/index/graphql")
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = uri.scheme == "https"
+      request = Net::HTTP::Post.new(uri.path, { "Content-Type" => "application/json" })
+      request.body = { query: query, variables: variables }.to_json
+
+      response = http.request(request)
+      JSON.parse(response.body)
+    end
+
     def build_url(from, to, trip_datetime, arrive_by, options={})
       # Set Default Options
       arrive_by = arrive_by.nil? ? true : arrive_by

@@ -388,8 +388,14 @@ class TripPlanner
   end
 
   # Generic OTP Call
-  def build_fixed_itineraries trip_type
-    @router.get_itineraries(trip_type).map {|i| Itinerary.new(i)}
+  def build_fixed_itineraries(trip_type)
+    if @router.use_graphql_for?(trip_type)
+      graphql_response = @router.get_itineraries(trip_type)
+      graphql_response.map { |i| Itinerary.new(i) }
+    else
+      @router.get_itineraries(trip_type).map { |i| Itinerary.new(i) }
+    end
   end
+  
 
 end

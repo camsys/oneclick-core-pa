@@ -118,12 +118,27 @@ class OTPAmbassador
   # Prepares a list of HTTP requests for the HTTP Request Bundler, based on request types
   def prepare_http_requests
     @request_types.map do |request_type|
-      {
-        label: request_type[:label],
-        url: @otp.plan_url(format_trip_as_otp_request(request_type)),
-        action: :get
-      }
+      if use_graphql_for?(request_type[:label])
+        response = @otp.plan_via_graphql(
+          [@trip.origin.lat, @trip.origin.lng],
+          [@trip.destination.lat, @trip.destination.lng],
+          @trip.trip_time,
+          @trip.arrive_by,
+          request_type[:modes].split(',')
+        )
+        Rails.logger.info "GraphQL response: #{response}"
+      else
+        {
+          label: request_type[:label],
+          url: @otp.plan_url(format_trip_as_otp_request(request_type)),
+          action: :get
+        }
+      end
     end
+  end
+
+  def use_graphql_for?(trip_type_label)
+    %i[otp_transit otp_paratransit].include?(trip_type_label)
   end
 
   # Formats the trip as an OTP request based on trip_type
