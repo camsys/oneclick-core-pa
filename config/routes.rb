@@ -81,6 +81,8 @@ Rails.application.routes.draw do
     ### API V2 ###
     namespace :v2 do
 
+      post '/graphql', to: 'graphql#execute'
+
       # Agencies
       resources :agencies, only: [:index]
 
