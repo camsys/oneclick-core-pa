@@ -269,22 +269,26 @@ class OTPAmbassador
     return otp_itin["walkDistance"]
   end
 
-  # Extracts cost from OTP itinerary
-  def extract_cost(itinerary)
-    # Try to fetch fare from itinerary-level fares
+  def extract_cost(itinerary, trip_type)
+    # Only process fares for relevant trip types (like transit).
+    return 0.0 unless [:transit, :bus, :rail].include?(trip_type)
+  
+    # Try to fetch fare from itinerary-level fares.
     fare = itinerary["fares"]&.first
     if fare
       return fare["cents"] / 100.0
     end
   
-    # Fallback to fetching fare from leg-level fareProducts
+    # Fallback to fetching fare from leg-level fareProducts.
     itinerary["legs"].each do |leg|
       leg["fareProducts"]&.each do |product|
-        return product["product"]["price"]["amount"] if product["product"]["price"]
+        if product["product"]["price"]
+          return product["product"]["price"]["amount"]
+        end
       end
     end
   
-    # Default to zero if no fare information is found
+    # Default to zero if no fare information is found.
     0.0
   end
   
