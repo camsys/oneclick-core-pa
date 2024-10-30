@@ -197,27 +197,28 @@ class OTPAmbassador
 
   # Modifies OTP Itin's legs, inserting information about 1-Click services
   def associate_legs_with_services(otp_itin)
-    Rails.logger.info "#otp_itin: #{otp_itin}"
-    otp_itin.legs ||= []
-    otp_itin.legs = otp_itin.legs.map do |leg|
+    otp_itin["legs"] ||= [] 
+  
+     otp_itin["legs"].map! do |leg|
       svc = get_associated_service_for(leg)
-
-      # double check if its paratransit but not set to that mode
-      if !leg['mode'].include?('FLEX') && leg['boardRule'] == 'mustPhone'
-        leg['mode'] = 'FLEX_ACCESS'
+  
+      # Ensure correct handling of paratransit mode
+      if !leg["mode"].include?("FLEX") && leg["boardRule"] == "mustPhone"
+        leg["mode"] = "FLEX_ACCESS"
       end
-
+  
+      # Attach service information if available
       if svc
-        leg['serviceId'] = svc.id
-        leg['serviceName'] = svc.name
-        leg['serviceFareInfo'] = svc.url  # Should point to service's fare_info_url, but we don't have that yet
-        leg['serviceLogoUrl'] = svc.full_logo_url
-        leg['serviceFullLogoUrl'] = svc.full_logo_url(nil) # actual size
+        leg["serviceId"] = svc.id
+        leg["serviceName"] = svc.name
+        leg["serviceFareInfo"] = svc.url
+        leg["serviceLogoUrl"] = svc.full_logo_url
+        leg["serviceFullLogoUrl"] = svc.full_logo_url(nil)
       else
-        leg['serviceName'] = (leg['agencyName'] || leg['agencyId'])
+        leg["serviceName"] = leg["agencyName"] || leg["agencyId"]
       end
-
-      leg
+  
+      leg  # Return the modified leg
     end
   end
 
