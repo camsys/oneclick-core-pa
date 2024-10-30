@@ -51,7 +51,7 @@ module OTP
     # Accepts a hash of additional options, none of which are required to make the plan call run
     def plan(from, to, trip_datetime, arrive_by = true, options = {})
       # Build the GraphQL endpoint URL
-      url = "https://hopelink-otp.ibi-transit.com/otp/graphql"
+      url = "https://hopelink-otp.ibi-transit.com/otp/routers/default/index/graphql"
     
       # Define the GraphQL query
       query = <<-GRAPHQL
