@@ -73,7 +73,9 @@ module OTP
                 legGeometry { points }
                 fareProducts {
                   product {
-                    price {
+                    name
+                    ... on DefaultFareProduct {
+                      # Adjust this to the correct field based on introspection
                       amount
                       currency { code }
                     }
