@@ -270,17 +270,24 @@ class OTPAmbassador
   end
 
   # Extracts cost from OTP itinerary
-  def extract_cost(otp_itin, trip_type)
-    # OTP returns a nil cost for walk trips.  nil means unknown, so it should be zero instead
-    case trip_type
-    when [:walk, :bicycle]
-      return 0.0
-    when [:car]
-      return nil
+  def extract_cost(itinerary)
+    # Try to fetch fare from itinerary-level fares
+    fare = itinerary["fares"]&.first
+    if fare
+      return fare["cents"] / 100.0
     end
-
-    otp_itin.fare_in_dollars
+  
+    # Fallback to fetching fare from leg-level fareProducts
+    itinerary["legs"].each do |leg|
+      leg["fareProducts"]&.each do |product|
+        return product["product"]["price"]["amount"] if product["product"]["price"]
+      end
+    end
+  
+    # Default to zero if no fare information is found
+    0.0
   end
+  
 
   # Extracts total distance from OTP itinerary
   # default conversion factor is for converting meters to miles
