@@ -385,18 +385,13 @@ class TripPlanner
 
   # Generic OTP Call
   def build_fixed_itineraries(trip_type)
-    service = @trip.services.first
-    otp_service = OTP::OTPService.new(@trip.service.base_url)
-    from = [@trip.origin.lat, @trip.origin.lng]
-    to = [@trip.destination.lat, @trip.destination.lng]
-  
     Rails.logger.info("Building itineraries for trip_type: #{trip_type}")
-    Rails.logger.info("From: #{from}, To: #{to}, Time: #{@trip.trip_time}")
-  
-    itineraries = otp_service.plan(from, to, @trip.trip_time)
+
+    itineraries = @router.get_itineraries(trip_type)
     Rails.logger.info("Itineraries fetched: #{itineraries}")
-  
+
     itineraries.map { |i| Itinerary.new(i) }
   end
+
 
 end
