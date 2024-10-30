@@ -71,6 +71,19 @@ module OTP
                 from { name lat lon }
                 to { name lat lon }
                 legGeometry { points }
+                fareProducts {
+                  product {
+                    price {
+                      amount
+                      currency { code }
+                    }
+                  }
+                }
+              }
+              fares {
+                type
+                cents
+                currency
               }
             }
           }
