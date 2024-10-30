@@ -385,6 +385,7 @@ class TripPlanner
 
   # Generic OTP Call
   def build_fixed_itineraries(trip_type)
+    service = @trip.services.first
     otp_service = OTP::OTPService.new(@trip.service.base_url)
     from = [@trip.origin.lat, @trip.origin.lng]
     to = [@trip.destination.lat, @trip.destination.lng]
