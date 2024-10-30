@@ -197,6 +197,7 @@ class OTPAmbassador
 
   # Modifies OTP Itin's legs, inserting information about 1-Click services
   def associate_legs_with_services(otp_itin)
+    Rails.logger.info "#otp_itin: #{otp_itin}"
     otp_itin.legs ||= []
     otp_itin.legs = otp_itin.legs.map do |leg|
       svc = get_associated_service_for(leg)
