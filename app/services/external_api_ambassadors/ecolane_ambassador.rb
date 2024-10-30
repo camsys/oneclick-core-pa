@@ -873,7 +873,7 @@ class EcolaneAmbassador < BookingAmbassador
       @booking_profile = UserBookingProfile.where(service: @service, external_user_id: @customer_number).first_or_create do |profile|
         random = SecureRandom.hex(8)
         sanitized_customer_number = @customer_number.gsub(' ', '_')
-        sanitized_county = @county.name.gsub(/[^0-9A-Za-z]/, '_').downcase
+        sanitized_county = sanitized_county.gsub(/[^0-9A-Za-z]/, '_').downcase
         email = "#{sanitized_customer_number}_#{sanitized_county}_#{@service_id}@ecolane_user.com"
         user = User.create!(
             email: email, 
