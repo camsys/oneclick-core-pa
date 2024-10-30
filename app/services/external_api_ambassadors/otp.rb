@@ -50,9 +50,9 @@ module OTP
     # arrive_by should be a boolean
     # Accepts a hash of additional options, none of which are required to make the plan call run
     def plan(from, to, trip_datetime, arrive_by = true, options = {})
-      url = build_url
-
-      query = <<~GRAPHQL
+      url = build_url(from, to, trip_datetime, arrive_by, options) 
+    
+      query = <<-GRAPHQL
         query($fromLat: Float!, $fromLon: Float!, $toLat: Float!, $toLon: Float!, $date: String!, $time: String!) {
           plan(
             from: { lat: $fromLat, lon: $fromLon }
@@ -74,36 +74,38 @@ module OTP
           }
         }
       GRAPHQL
-
+    
       variables = {
-        fromLat: from[0], fromLon: from[1],
-        toLat: to[0], toLon: to[1],
+        fromLat: from[0],
+        fromLon: from[1],
+        toLat: to[0],
+        toLon: to[1],
         date: trip_datetime.strftime("%Y-%m-%d"),
         time: trip_datetime.strftime("%H:%M")
       }
-
-      response = execute_graphql_query(url, from, to, trip_datetime, arrive_by, options)
-      Rails.logger.info response.inspect
-      return response
-      if response["data"] && response["data"]["plan"]
-        response["data"]["plan"]["itineraries"].map { |i| parse_itinerary(i) }
-      else
-        Rails.logger.error("GraphQL query failed: #{response["errors"].inspect}")
-        []
-      end
-    end
-
-    def make_graphql_request(url, query, variables)
-      uri = URI.parse(url)
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = (uri.scheme == "https")
-
-      request = Net::HTTP::Post.new(uri.path, { 'Content-Type' => 'application/json' })
-      request.body = { query: query, variables: variables }.to_json
-
-      response = http.request(request)
+    
+      headers = {
+        'Content-Type' => 'application/json',
+        'x-user-email' => '1-click@camsys.com',
+        'x-user-token' => 'sRRTZ3BV3tmms1o4QNk2'
+      }
+    
+      body = { query: query, variables: variables }.to_json
+    
+      response = make_graphql_request(url, body, headers)
       JSON.parse(response.body)
     end
+  
+    def make_graphql_request(url, body, headers)
+      uri = URI.parse(url)
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = (uri.scheme == 'https')
+    
+      request = Net::HTTP::Post.new(uri.request_uri, headers)
+      request.body = body
+    
+      http.request(request)
+    end      
 
     def parse_itinerary(itinerary)
       {
