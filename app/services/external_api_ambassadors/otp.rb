@@ -50,7 +50,8 @@ module OTP
     # arrive_by should be a boolean
     # Accepts a hash of additional options, none of which are required to make the plan call run
     def plan(from, to, trip_datetime, arrive_by = true, options = {})
-      url = build_url(from, to, trip_datetime, arrive_by, options) 
+      url = build_url(from, to, trip_datetime, arrive_by, options)
+      Rails.logger.info "OTP URL: #{url}"
     
       query = <<-GRAPHQL
         query($fromLat: Float!, $fromLon: Float!, $toLat: Float!, $toLon: Float!, $date: String!, $time: String!) {
@@ -92,7 +93,11 @@ module OTP
     
       body = { query: query, variables: variables }.to_json
     
+      Rails.logger.info("Sending GraphQL request with URL: #{url}")
+      Rails.logger.info("Request body: #{body}")
       response = make_graphql_request(url, body, headers)
+      Rails.logger.info("GraphQL response: #{response.body}")
+    
       JSON.parse(response.body)
     end
   
@@ -104,10 +109,12 @@ module OTP
       request = Net::HTTP::Post.new(uri.request_uri, headers)
       request.body = body
     
+      Rails.logger.info("Making POST request to #{uri}")
       http.request(request)
-    end      
-
+    end
+    
     def parse_itinerary(itinerary)
+      Rails.logger.info("Parsing itinerary: #{itinerary}")
       {
         start_time: Time.at(itinerary["startTime"] / 1000),
         end_time: Time.at(itinerary["endTime"] / 1000),

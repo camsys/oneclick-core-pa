@@ -388,8 +388,14 @@ class TripPlanner
     otp_service = OTP::OTPService.new(@trip.service.base_url)
     from = [@trip.origin.lat, @trip.origin.lng]
     to = [@trip.destination.lat, @trip.destination.lng]
-
-    otp_service.plan(from, to, @trip.trip_time).map { |i| Itinerary.new(i) }
+  
+    Rails.logger.info("Building itineraries for trip_type: #{trip_type}")
+    Rails.logger.info("From: #{from}, To: #{to}, Time: #{@trip.trip_time}")
+  
+    itineraries = otp_service.plan(from, to, @trip.trip_time)
+    Rails.logger.info("Itineraries fetched: #{itineraries}")
+  
+    itineraries.map { |i| Itinerary.new(i) }
   end
 
 end
