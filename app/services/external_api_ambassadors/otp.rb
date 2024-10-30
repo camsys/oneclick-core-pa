@@ -49,18 +49,74 @@ module OTP
     # trip_datetime should be a DateTime object;
     # arrive_by should be a boolean
     # Accepts a hash of additional options, none of which are required to make the plan call run
-    def plan(from, to, trip_datetime, arrive_by=true, options={})
+    def plan(from, to, trip_datetime, arrive_by = true, options = {})
+      graphql_url = build_url + "/graphql" 
 
-      url = build_url(from, to, trip_datetime, arrive_by, options)
+      query = <<~GRAPHQL
+        query($fromLat: Float!, $fromLon: Float!, $toLat: Float!, $toLon: Float!, $date: String!, $time: String!) {
+          plan(
+            from: { lat: $fromLat, lon: $fromLon }
+            to: { lat: $toLat, lon: $toLon }
+            date: $date
+            time: $time
+            transportModes: [{ mode: WALK }, { mode: TRANSIT }]
+          ) {
+            itineraries {
+              startTime
+              endTime
+              legs {
+                mode
+                from { name lat lon }
+                to { name lat lon }
+                legGeometry { points }
+              }
+            }
+          }
+        }
+      GRAPHQL
 
-      begin
-        resp = Net::HTTP.get_response(URI.parse(url))
-      rescue Exception=>e
-        return {'id'=>500, 'msg'=>e.to_s}
+      variables = {
+        fromLat: from[0], fromLon: from[1],
+        toLat: to[0], toLon: to[1],
+        date: trip_datetime.strftime("%Y-%m-%d"),
+        time: trip_datetime.strftime("%H:%M")
+      }
+
+      response = make_graphql_request(graphql_url, query, variables)
+
+      if response["data"] && response["data"]["plan"]
+        response["data"]["plan"]["itineraries"].map { |i| parse_itinerary(i) }
+      else
+        Rails.logger.error("GraphQL query failed: #{response["errors"].inspect}")
+        []
       end
+    end
 
-      return resp
+    def make_graphql_request(url, query, variables)
+      uri = URI.parse(url)
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = (uri.scheme == "https")
 
+      request = Net::HTTP::Post.new(uri.path, { 'Content-Type' => 'application/json' })
+      request.body = { query: query, variables: variables }.to_json
+
+      response = http.request(request)
+      JSON.parse(response.body)
+    end
+
+    def parse_itinerary(itinerary)
+      {
+        start_time: Time.at(itinerary["startTime"] / 1000),
+        end_time: Time.at(itinerary["endTime"] / 1000),
+        legs: itinerary["legs"].map do |leg|
+          {
+            mode: leg["mode"],
+            from: { name: leg["from"]["name"], lat: leg["from"]["lat"], lon: leg["from"]["lon"] },
+            to: { name: leg["to"]["name"], lat: leg["to"]["lat"], lon: leg["to"]["lon"] },
+            points: leg["legGeometry"]["points"]
+          }
+        end
+      }
     end
 
     def build_url(from, to, trip_datetime, arrive_by, options={})
