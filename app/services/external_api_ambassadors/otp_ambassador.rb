@@ -189,7 +189,7 @@ class OTPAmbassador
       wait_time: get_wait_time(otp_itin),
       walk_distance: get_walk_distance(otp_itin),
       cost: extract_cost(otp_itin, trip_type),
-      legs: otp_itin.legs.to_a,
+      legs: otp_itin["legs"].to_a,
       trip_type: trip_type, #TODO: Make this smarter
       service_id: service_id
     }
