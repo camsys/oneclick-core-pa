@@ -50,9 +50,10 @@ module OTP
     # arrive_by should be a boolean
     # Accepts a hash of additional options, none of which are required to make the plan call run
     def plan(from, to, trip_datetime, arrive_by = true, options = {})
-      url = build_url(from, to, trip_datetime, arrive_by, options)
-      Rails.logger.info "OTP URL: #{url}"
+      # Build the GraphQL endpoint URL
+      url = "https://hopelink-otp.ibi-transit.com/otp/graphql"
     
+      # Define the GraphQL query
       query = <<-GRAPHQL
         query($fromLat: Float!, $fromLon: Float!, $toLat: Float!, $toLon: Float!, $date: String!, $time: String!) {
           plan(
@@ -76,6 +77,7 @@ module OTP
         }
       GRAPHQL
     
+      # Define variables for the GraphQL query
       variables = {
         fromLat: from[0],
         fromLon: from[1],
@@ -85,31 +87,39 @@ module OTP
         time: trip_datetime.strftime("%H:%M")
       }
     
+      # Headers for the GraphQL request
       headers = {
         'Content-Type' => 'application/json',
         'x-user-email' => '1-click@camsys.com',
         'x-user-token' => 'sRRTZ3BV3tmms1o4QNk2'
       }
     
+      # Body for the GraphQL request
       body = { query: query, variables: variables }.to_json
     
+      # Log the request details
       Rails.logger.info("Sending GraphQL request with URL: #{url}")
       Rails.logger.info("Request body: #{body}")
+    
+      # Make the GraphQL request
       response = make_graphql_request(url, body, headers)
+    
+      # Log the response
       Rails.logger.info("GraphQL response: #{response.body}")
     
+      # Parse and return the JSON response
       JSON.parse(response.body)
     end
-  
+   
+    # Helper method to make the GraphQL request
     def make_graphql_request(url, body, headers)
       uri = URI.parse(url)
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = (uri.scheme == 'https')
-    
+
       request = Net::HTTP::Post.new(uri.request_uri, headers)
       request.body = body
-    
-      Rails.logger.info("Making POST request to #{uri}")
+
       http.request(request)
     end
     
