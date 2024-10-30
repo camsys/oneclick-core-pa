@@ -74,9 +74,22 @@ class OTPAmbassador
 
   # Returns an array of 1-Click-ready itinerary hashes.
   def get_itineraries(trip_type)
-    return [] if errors(trip_type)
-    itineraries = ensure_response(trip_type).itineraries
-    return itineraries.map {|i| convert_itinerary(i, trip_type)}.compact
+    Rails.logger.info("Fetching itineraries for trip_type: #{trip_type}")
+
+    from = [@trip.origin.lat, @trip.origin.lng]
+    to = [@trip.destination.lat, @trip.destination.lng]
+    trip_time = @trip.trip_time
+
+    response = @otp.plan(from, to, trip_time)
+
+    if response["data"] && response["data"]["plan"]["itineraries"]
+      itineraries = response["data"]["plan"]["itineraries"]
+      Rails.logger.info("Itineraries fetched: #{itineraries}")
+      itineraries.map { |i| convert_itinerary(i, trip_type) }
+    else
+      Rails.logger.error("GraphQL error: #{response}")
+      []
+    end
   end
 
   # Extracts a trip duration from the OTP response.
