@@ -81,8 +81,8 @@ module OTP
       variables = {
         fromLat: from[0].to_f,
         fromLon: from[1].to_f,
-        toLat: to[0],
-        toLon: to[1],
+        toLat: to[0].to_f,
+        toLon: to[1].to_f,
         date: trip_datetime.strftime("%Y-%m-%d"),
         time: trip_datetime.strftime("%H:%M")
       }
