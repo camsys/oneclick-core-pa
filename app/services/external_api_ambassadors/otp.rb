@@ -79,8 +79,8 @@ module OTP
     
       # Define variables for the GraphQL query
       variables = {
-        fromLat: from[0],
-        fromLon: from[1],
+        fromLat: from[0].to_f,
+        fromLon: from[1].to_f,
         toLat: to[0],
         toLon: to[1],
         date: trip_datetime.strftime("%Y-%m-%d"),
