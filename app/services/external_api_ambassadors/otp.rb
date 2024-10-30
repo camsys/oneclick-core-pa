@@ -61,31 +61,57 @@ module OTP
             to: { lat: $toLat, lon: $toLon }
             date: $date
             time: $time
-            transportModes: [{ mode: WALK }, { mode: TRANSIT }]
+            transportModes: [{ mode: TRANSIT }, { mode: WALK }]
           ) {
             itineraries {
               startTime
               endTime
-              legs {
-                mode
-                from { name lat lon }
-                to { name lat lon }
-                legGeometry { points }
-                fareProducts {
-                  product {
-                    name
-                    ... on DefaultFareProduct {
-                      # Adjust this to the correct field based on introspection
-                      amount
-                      currency { code }
-                    }
-                  }
-                }
-              }
               fares {
                 type
                 cents
                 currency
+                components {
+                  fareId
+                  currency
+                  cents
+                  routes {
+                    gtfsId
+                    shortName
+                  }
+                }
+              }
+              legs {
+                mode
+                from {
+                  name
+                  lat
+                  lon
+                  departureTime
+                }
+                to {
+                  name
+                  lat
+                  lon
+                  arrivalTime
+                }
+                fareProducts {
+                  id
+                  product {
+                    name
+                    ... on DefaultFareProduct {
+                      price {
+                        amount
+                        currency {
+                          code
+                          digits
+                        }
+                      }
+                    }
+                    riderCategory {
+                      name
+                    }
+                  }
+                }
               }
             }
           }
