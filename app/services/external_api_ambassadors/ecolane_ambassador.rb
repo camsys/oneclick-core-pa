@@ -871,6 +871,11 @@ class EcolaneAmbassador < BookingAmbassador
     valid_passenger, passenger = validate_passenger
     if valid_passenger
       user = nil
+      service = Service.find_by("booking_details ->> 'home_counties' ILIKE ?", "%#{county_name}%")
+      if service.nil?
+        Rails.logger.info "No service found for county: #{county_name}"
+        return nil
+      end
       @booking_profile = UserBookingProfile.where(service: @service, external_user_id: @customer_number).first_or_create do |profile|
         random = SecureRandom.hex(8)
         sanitized_customer_number = @customer_number.gsub(' ', '_')
@@ -889,7 +894,8 @@ class EcolaneAmbassador < BookingAmbassador
         profile.user = user
         # do not try to sync user here - reenters ecolane_ambassador ctor
       end
-      Rails.logger.info "Booking Profile: #{@booking_profile}"
+      Rails.logger.info "Booking Profile created with service ID: #{service.id}"
+
       # Update the user's booking profile with the user's county from login info.
       if @booking_profile&.details
         @booking_profile.details[:county] = @county
