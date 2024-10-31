@@ -871,6 +871,7 @@ class EcolaneAmbassador < BookingAmbassador
     if valid_passenger
       user = nil
       county_name = @county.try(:capitalize)
+      service_id = @service.id
       Rails.logger.info "Service: #{@service}"
       Rails.logger.info "Service ID: #{@service_id}"
       @booking_profile = UserBookingProfile.where(service: @service, external_user_id: @customer_number).first_or_create do |profile|
