@@ -10,7 +10,7 @@ class EcolaneAmbassador < BookingAmbassador
     @county = opts[:county]
     lowercase_county = @county&.downcase
     @dob = opts[:dob]
-    @service ||= county_map.find { |key, _| key.downcase == lowercase_county }&.second
+    @service_id = opts[:service_id]
     Rails.logger.info "Service ID: #{@service_id}"
     if opts[:trip]
       self.trip = opts[:trip]
@@ -874,9 +874,11 @@ class EcolaneAmbassador < BookingAmbassador
       @booking_profile = UserBookingProfile.where(service: @service, external_user_id: @customer_number).first_or_create do |profile|
         random = SecureRandom.hex(8)
         sanitized_customer_number = @customer_number.gsub(' ', '_')
+        Rails.logger.info "County: #{@county}"
         Rails.logger.info "Servive ID: #{@service_id}"
         sanitized_county = @county.to_s.gsub(/[^0-9A-Za-z]/, '_').downcase
         email = "#{sanitized_customer_number}_#{sanitized_county}_#{@service_id}@ecolane_user.com"
+        Rails.logger.info "Email: #{email}"
         user = User.create!(
             email: email, 
             password: random, 
@@ -887,6 +889,8 @@ class EcolaneAmbassador < BookingAmbassador
         profile.user = user
         # do not try to sync user here - reenters ecolane_ambassador ctor
       end
+      Rails.logger.info "Booking Profile: #{@booking_profile}"
+      Rails.logger.info "email: #{user.email}"
       # Update the user's booking profile with the user's county from login info.
       if @booking_profile&.details
         @booking_profile.details[:county] = @county

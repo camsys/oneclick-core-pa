@@ -18,6 +18,7 @@ module Api
         @user = User.find_by(email: email)
         ecolane_id = session_params[:ecolane_id]
         county = session_params[:county]
+        Rails.logger.info "County: #{county}"
         dob = session_params[:dob]
 
         ############## Custom Ecolane Stuff ######################
