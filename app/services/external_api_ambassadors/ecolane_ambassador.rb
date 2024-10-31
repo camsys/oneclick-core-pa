@@ -10,12 +10,11 @@ class EcolaneAmbassador < BookingAmbassador
     @county = opts[:county]
     lowercase_county = @county&.downcase
     @dob = opts[:dob]
-    @service_id = opts[:service_id]
-    Rails.logger.info "Service ID: #{@service_id}"
     if opts[:trip]
       self.trip = opts[:trip]
     end
     self.service = opts[:service] if opts[:service]
+    Rails.logger.info "service: #{service}"
     @customer_number = opts[:ecolane_id] #This is what the customer knows
     @customer_id = nil #This is how Ecolane identifies the customer. This is set by get_user.
     @service ||= county_map.find { |key, _| key.downcase == lowercase_county }&.second
