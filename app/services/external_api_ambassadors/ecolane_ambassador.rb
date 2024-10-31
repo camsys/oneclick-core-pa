@@ -14,11 +14,12 @@ class EcolaneAmbassador < BookingAmbassador
       self.trip = opts[:trip]
     end
     self.service = opts[:service] if opts[:service]
-    Rails.logger.info "service: #{service}"
     @customer_number = opts[:ecolane_id] #This is what the customer knows
     @customer_id = nil #This is how Ecolane identifies the customer. This is set by get_user.
     @service ||= county_map.find { |key, _| key.downcase == lowercase_county }&.second
     @service_id = @service&.id
+    Rails.logger.info "Service: #{@service}"
+    Rails.logger.info "Service ID: #{@service_id}"
     self.system_id ||= @service.booking_details[:external_id]
     self.token = @service.booking_details[:token]
     self.api_key = @service.booking_details[:api_key]
@@ -872,8 +873,6 @@ class EcolaneAmbassador < BookingAmbassador
     if valid_passenger
       user = nil
       county_name = @county.try(:capitalize)
-      Rails.logger.info "Service: #{@service}"
-      Rails.logger.info "Service ID: #{@service_id}"
       @booking_profile = UserBookingProfile.where(service: @service, external_user_id: @customer_number).first_or_create do |profile|
         random = SecureRandom.hex(8)
         sanitized_customer_number = @customer_number.gsub(' ', '_')
