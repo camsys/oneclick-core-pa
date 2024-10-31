@@ -871,6 +871,7 @@ class EcolaneAmbassador < BookingAmbassador
     valid_passenger, passenger = validate_passenger
     if valid_passenger
       user = nil
+      county_name = @county.try(:capitalize)
       service = Service.find_by("booking_details ->> 'home_counties' ILIKE ?", "%#{county_name}%")
       if service.nil?
         Rails.logger.info "No service found for county: #{county_name}"
