@@ -11,6 +11,7 @@ class EcolaneAmbassador < BookingAmbassador
     lowercase_county = @county&.downcase
     @dob = opts[:dob]
     @service_id = opts[:service_id]
+    Rails.logger.info "Service ID: #{@service_id}"
     if opts[:trip]
       self.trip = opts[:trip]
     end
@@ -873,6 +874,7 @@ class EcolaneAmbassador < BookingAmbassador
       @booking_profile = UserBookingProfile.where(service: @service, external_user_id: @customer_number).first_or_create do |profile|
         random = SecureRandom.hex(8)
         sanitized_customer_number = @customer_number.gsub(' ', '_')
+        Rails.logger.info "Servive ID: #{@service_id}"
         sanitized_county = @county.to_s.gsub(/[^0-9A-Za-z]/, '_').downcase
         email = "#{sanitized_customer_number}_#{sanitized_county}_#{@service_id}@ecolane_user.com"
         user = User.create!(
