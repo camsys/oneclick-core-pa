@@ -10,7 +10,7 @@ class EcolaneAmbassador < BookingAmbassador
     @county = opts[:county]
     lowercase_county = @county&.downcase
     @dob = opts[:dob]
-    @service_id = opts[:service_id]
+    @service ||= county_map.find { |key, _| key.downcase == lowercase_county }&.second
     Rails.logger.info "Service ID: #{@service_id}"
     if opts[:trip]
       self.trip = opts[:trip]
