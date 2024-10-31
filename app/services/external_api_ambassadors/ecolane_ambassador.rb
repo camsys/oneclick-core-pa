@@ -13,7 +13,6 @@ class EcolaneAmbassador < BookingAmbassador
     if opts[:trip]
       self.trip = opts[:trip]
     end
-    self.service = opts[:service] if opts[:service]
     @customer_number = opts[:ecolane_id] #This is what the customer knows
     @customer_id = nil #This is how Ecolane identifies the customer. This is set by get_user.
     @service ||= county_map.find { |key, _| key.downcase == lowercase_county }&.second
