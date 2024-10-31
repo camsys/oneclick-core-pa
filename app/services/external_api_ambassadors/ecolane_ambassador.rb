@@ -871,11 +871,6 @@ class EcolaneAmbassador < BookingAmbassador
     if valid_passenger
       user = nil
       county_name = @county.try(:capitalize)
-      service = Service.find_by("booking_details ->> 'home_counties' ILIKE ?", "%#{county_name}%")
-      if service.nil?
-        Rails.logger.info "No service found for county: #{county_name}"
-        return nil
-      end
       @booking_profile = UserBookingProfile.where(service: @service, external_user_id: @customer_number).first_or_create do |profile|
         random = SecureRandom.hex(8)
         sanitized_customer_number = @customer_number.gsub(' ', '_')
