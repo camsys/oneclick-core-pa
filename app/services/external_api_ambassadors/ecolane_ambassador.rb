@@ -890,7 +890,6 @@ class EcolaneAmbassador < BookingAmbassador
         # do not try to sync user here - reenters ecolane_ambassador ctor
       end
       Rails.logger.info "Booking Profile: #{@booking_profile}"
-      Rails.logger.info "email: #{user.email}"
       # Update the user's booking profile with the user's county from login info.
       if @booking_profile&.details
         @booking_profile.details[:county] = @county
