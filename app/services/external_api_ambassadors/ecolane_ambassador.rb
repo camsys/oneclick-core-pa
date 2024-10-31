@@ -871,10 +871,11 @@ class EcolaneAmbassador < BookingAmbassador
     if valid_passenger
       user = nil
       county_name = @county.try(:capitalize)
+      Rails.logger.info "Service: #{@service}"
+      Rails.logger.info "Service ID: #{@service_id}"
       @booking_profile = UserBookingProfile.where(service: @service, external_user_id: @customer_number).first_or_create do |profile|
         random = SecureRandom.hex(8)
         sanitized_customer_number = @customer_number.gsub(' ', '_')
-        Rails.logger.info "County: #{@county}"
         Rails.logger.info "Servive ID: #{@service_id}"
         sanitized_county = @county.to_s.gsub(/[^0-9A-Za-z]/, '_').downcase
         email = "#{sanitized_customer_number}_#{sanitized_county}_#{@service_id}@ecolane_user.com"
@@ -889,7 +890,6 @@ class EcolaneAmbassador < BookingAmbassador
         profile.user = user
         # do not try to sync user here - reenters ecolane_ambassador ctor
       end
-      Rails.logger.info "Booking Profile created with service ID: #{service.id}"
 
       # Update the user's booking profile with the user's county from login info.
       if @booking_profile&.details
