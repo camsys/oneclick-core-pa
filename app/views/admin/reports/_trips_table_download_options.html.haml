@@ -34,15 +34,16 @@
   = f.input :ecolane_denied_trips_only, as: :boolean, label: "Only Ecolane Denied Trips", checked: true
 
 -# TRIP ORIGIN REGION BUILDER
-- if can?(:manage, Region)
-  = render partial: 'admin/services/region_builder', locals: { wrapper_id: 'trip-origin-recipe', label_text: "Origin" }
-  = f.input :trip_origin_recipe, as: :hidden, input_html: { value: '[]', disabled: false }
-
+=render partial: 'admin/services/region_builder',
+  locals: { wrapper_id: 'trip-origin-recipe', label_text: "Origin"}
+=f.input :trip_origin_recipe, as: :hidden,
+  input_html: { value: '[]'}
+  
 -# TRIP DESTINATION REGION BUILDER
-- if can?(:manage, Region)
-  = render partial: 'admin/services/region_builder', locals: { wrapper_id: 'trip-destination-recipe', label_text: "Destination" }
-  = f.input :trip_destination_recipe, as: :hidden, input_html: { value: '[]', disabled: false }
-
+=render partial: 'admin/services/region_builder',
+  locals: { wrapper_id: 'trip-destination-recipe', label_text: "Destination"}
+=f.input :trip_destination_recipe, as: :hidden,
+  input_html: { value: '[]'}
 
 = "NOTE: Reports will be limited to #{CSVWriter::DEFAULT_RECORD_LIMIT} records!"
 
