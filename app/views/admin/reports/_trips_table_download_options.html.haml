@@ -9,7 +9,7 @@
 -# FILTER OUT TRIPS NOT CREATED IN ONE CLICK
 - if in_travel_patterns_mode?
   =f.hidden_field :trip_only_created_in_1click, value: true
-  
+
 -# TRIP PURPOSES
 - unless in_travel_patterns_mode?
   .purposes-filter
@@ -39,40 +39,41 @@
     locals: { wrapper_id: 'trip-origin-recipe', label_text: "Origin" }
   = f.input :trip_origin_recipe, as: :hidden, input_html: { value: '[]' }
 
-  
 -# TRIP DESTINATION REGION BUILDER
-=render partial: 'admin/services/region_builder',
-  locals: { wrapper_id: 'trip-destination-recipe', label_text: "Destination"}
-=f.input :trip_destination_recipe, as: :hidden,
-  input_html: { value: '[]'}
+- if can?(:manage, :trip_destination_region)
+  = render partial: 'admin/services/region_builder',
+    locals: { wrapper_id: 'trip-destination-recipe', label_text: "Destination" }
+  = f.input :trip_destination_recipe, as: :hidden, input_html: { value: '[]' }
 
 = "NOTE: Reports will be limited to #{CSVWriter::DEFAULT_RECORD_LIMIT} records!"
 
-
-
 :javascript
-  $(document).ready(function() {
-    
-    
-    // Set up serializer and autocomplete for region builders
-    
-    var tripOriginRecipe = new M.Recipe({
-      container: $('#trip-origin-recipe'),
-      recipeInput: $('#download_table_trip_origin_recipe'),
+  document.addEventListener('DOMContentLoaded', function() {
+    // Initialize the region builders for trip origin and destination
+    const tripOriginRecipe = new M.Recipe({
+      container: document.getElementById('trip-origin-recipe'),
+      recipeInput: document.getElementById('download_table_trip_origin_recipe'),
       searchPath: '#{admin_autocomplete_path}',
       ingredientLabelTag: '#{escape_javascript render partial: "admin/geographies/ingredient_label"}'
     });
-    
-    var tripDestinationRecipe = new M.Recipe({
-      container: $('#trip-destination-recipe'),
-      recipeInput: $('#download_table_trip_destination_recipe'),
+
+    const tripDestinationRecipe = new M.Recipe({
+      container: document.getElementById('trip-destination-recipe'),
+      recipeInput: document.getElementById('download_table_trip_destination_recipe'),
       searchPath: '#{admin_autocomplete_path}',
       ingredientLabelTag: '#{escape_javascript render partial: "admin/geographies/ingredient_label"}'
     });
 
     // Auto-check the Ecolane Denied Trips checkbox on page load if in travel patterns mode
-    if ($('#download_table_ecolane_denied_trips_only').length) {
-      $('#download_table_ecolane_denied_trips_only').prop('checked', true);
+    const ecolaneCheckbox = document.getElementById('download_table_ecolane_denied_trips_only');
+    if (ecolaneCheckbox) {
+      ecolaneCheckbox.checked = true;
     }
-    
+
+    // Enable the input fields for Transportation Agency Admins
+    const userRole = document.getElementById('user-role')?.dataset?.role;
+    if (userRole === 'transportation_admin') {
+      document.getElementById('trip-origin-recipe').removeAttribute('disabled');
+      document.getElementById('trip-destination-recipe').removeAttribute('disabled');
+    }
   });
