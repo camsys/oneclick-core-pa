@@ -34,10 +34,11 @@
   = f.input :ecolane_denied_trips_only, as: :boolean, label: "Only Ecolane Denied Trips", checked: true
 
 -# TRIP ORIGIN REGION BUILDER
-=render partial: 'admin/services/region_builder',
-  locals: { wrapper_id: 'trip-origin-recipe', label_text: "Origin"}
-=f.input :trip_origin_recipe, as: :hidden,
-  input_html: { value: '[]'}
+- if can?(:manage, :trip_origin_region)
+  = render partial: 'admin/services/region_builder',
+    locals: { wrapper_id: 'trip-origin-recipe', label_text: "Origin" }
+  = f.input :trip_origin_recipe, as: :hidden, input_html: { value: '[]' }
+
   
 -# TRIP DESTINATION REGION BUILDER
 =render partial: 'admin/services/region_builder',
