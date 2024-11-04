@@ -10,14 +10,15 @@ class EcolaneAmbassador < BookingAmbassador
     @county = opts[:county]
     lowercase_county = @county&.downcase
     @dob = opts[:dob]
-    @service_id = opts[:service_id]
     if opts[:trip]
       self.trip = opts[:trip]
     end
-    self.service = opts[:service] if opts[:service]
     @customer_number = opts[:ecolane_id] #This is what the customer knows
     @customer_id = nil #This is how Ecolane identifies the customer. This is set by get_user.
     @service ||= county_map.find { |key, _| key.downcase == lowercase_county }&.second
+    @service_id = @service&.id
+    Rails.logger.info "Service: #{@service}"
+    Rails.logger.info "Service ID: #{@service_id}"
     self.system_id ||= @service.booking_details[:external_id]
     self.token = @service.booking_details[:token]
     self.api_key = @service.booking_details[:api_key]
@@ -870,11 +871,14 @@ class EcolaneAmbassador < BookingAmbassador
     valid_passenger, passenger = validate_passenger
     if valid_passenger
       user = nil
+      county_name = @county.try(:capitalize)
       @booking_profile = UserBookingProfile.where(service: @service, external_user_id: @customer_number).first_or_create do |profile|
         random = SecureRandom.hex(8)
         sanitized_customer_number = @customer_number.gsub(' ', '_')
-        sanitized_county = @county.name.gsub(/[^0-9A-Za-z]/, '_').downcase
+        Rails.logger.info "Servive ID: #{@service_id}"
+        sanitized_county = @county.to_s.gsub(/[^0-9A-Za-z]/, '_').downcase
         email = "#{sanitized_customer_number}_#{sanitized_county}_#{@service_id}@ecolane_user.com"
+        Rails.logger.info "Email: #{email}"
         user = User.create!(
             email: email, 
             password: random, 
@@ -885,6 +889,7 @@ class EcolaneAmbassador < BookingAmbassador
         profile.user = user
         # do not try to sync user here - reenters ecolane_ambassador ctor
       end
+
       # Update the user's booking profile with the user's county from login info.
       if @booking_profile&.details
         @booking_profile.details[:county] = @county
