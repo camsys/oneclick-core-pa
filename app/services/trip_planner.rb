@@ -386,12 +386,43 @@ class TripPlanner
   # Generic OTP Call
   def build_fixed_itineraries(trip_type)
     Rails.logger.info("Building itineraries for trip_type: #{trip_type}")
-
+  
     itineraries = @router.get_itineraries(trip_type)
     Rails.logger.info("Itineraries fetched: #{itineraries}")
-
-    itineraries.map { |i| Itinerary.new(i) }
+  
+    itineraries.map do |itinerary_data|
+      # Calculate total walk time, transit time, and wait time for each itinerary
+      walk_time = 0
+      transit_time = 0
+      wait_time = 0
+  
+      itinerary_data["legs"].each_with_index do |leg, index|
+        duration_minutes = ((leg["to"]["arrivalTime"] - leg["from"]["departureTime"]) / 60000).to_i
+  
+        case leg["mode"]
+        when "WALK"
+          walk_time += duration_minutes
+        when "BUS", "TRAIN", "TRAM", "SUBWAY"
+          transit_time += duration_minutes
+        end
+  
+        # Calculate wait time as the time gap between legs if there’s a next leg
+        if index < itinerary_data["legs"].size - 1
+          next_leg = itinerary_data["legs"][index + 1]
+          wait_time += ((next_leg["from"]["departureTime"] - leg["to"]["arrivalTime"]) / 60000).to_i
+        end
+      end
+  
+      # Store calculated times in the itinerary hash for later use
+      itinerary_data["walk_time"] = walk_time
+      itinerary_data["transit_time"] = transit_time
+      itinerary_data["wait_time"] = wait_time
+  
+      # Instantiate Itinerary with pre-calculated times
+      Itinerary.new(itinerary_data)
+    end
   end
+  
 
 
 end
