@@ -178,7 +178,7 @@ class TripPlanner
       # Test: Filter out walk-only itineraries when walking is deselected
       if !@trip.itineraries.map(&:trip_type).include?('walk') && itin.trip_type == 'transit' && 
         itin.legs.all? { |leg| leg['mode'] == 'WALK' } && 
-        if itin.walk_distance && itin.walk_distance >= itin.legs.first['distance']
+        itin.walk_distance && itin.walk_distance >= itin.legs.first['distance']
       next
       end
 
