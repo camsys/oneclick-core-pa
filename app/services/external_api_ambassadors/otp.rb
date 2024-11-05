@@ -168,8 +168,8 @@ module OTP
     def parse_itinerary(itinerary)
       Rails.logger.info("Parsing itinerary: #{itinerary}")
       {
-        start_time: Time.at(itinerary["startTime"] / 1000),
-        end_time: Time.at(itinerary["endTime"] / 1000),
+        startTime: Time.at(itinerary["startTime"] / 1000),
+        endTime: Time.at(itinerary["endTime"] / 1000),
         legs: itinerary["legs"].map do |leg|
           {
             mode: leg["mode"],
