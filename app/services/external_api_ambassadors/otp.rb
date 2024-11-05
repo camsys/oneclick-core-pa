@@ -82,6 +82,7 @@ module OTP
               }
               legs {
                 mode
+                distance
                 from {
                   name
                   lat
