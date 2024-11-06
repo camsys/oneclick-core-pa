@@ -172,25 +172,25 @@ class OTPAmbassador
   # Converts an OTP itinerary hash into a set of 1-Click itinerary attributes
   def convert_itinerary(otp_itin, trip_type)
     associate_legs_with_services(otp_itin)
-    itin_has_invalid_leg = otp_itin["legs"].detect do |leg|
-      leg["serviceName"] && leg["serviceId"].nil?
-    end
+    itin_has_invalid_leg = otp_itin.legs.detect{ |leg| 
+      leg['serviceName'] && leg['serviceId'].nil?
+    }
     return nil if itin_has_invalid_leg
 
-    service_id = otp_itin["legs"]
-                  .detect { |leg| leg["serviceId"].present? }
-                  &.fetch("serviceId", nil)
+    service_id = otp_itin.legs
+                          .detect{ |leg| leg['serviceId'].present? }
+                          &.fetch('serviceId', nil)
 
-    {
-      start_time: Time.at(otp_itin["startTime"].to_i / 1000).in_time_zone,
-      end_time: Time.at(otp_itin["endTime"].to_i / 1000).in_time_zone,
+    return {
+      start_time: Time.at(otp_itin["startTime"].to_i/1000).in_time_zone,
+      end_time: Time.at(otp_itin["endTime"].to_i/1000).in_time_zone,
       transit_time: get_transit_time(otp_itin, trip_type),
       walk_time: get_walk_time(otp_itin, trip_type),
       wait_time: get_wait_time(otp_itin),
       walk_distance: get_walk_distance(otp_itin),
       cost: extract_cost(otp_itin, trip_type),
-      legs: otp_itin["legs"].to_a,
-      trip_type: trip_type,
+      legs: otp_itin.legs.to_a,
+      trip_type: trip_type, #TODO: Make this smarter
       service_id: service_id
     }
   end
