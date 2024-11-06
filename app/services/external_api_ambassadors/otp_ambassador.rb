@@ -173,10 +173,6 @@ class OTPAmbassador
   def convert_itinerary(otp_itin, trip_type)
     associate_legs_with_services(otp_itin)
 
-    service_id = otp_itin.legs
-                          .detect{ |leg| leg['serviceId'].present? }
-                          &.fetch('serviceId', nil)
-
     return {
       start_time: Time.at(otp_itin["startTime"].to_i/1000).in_time_zone,
       end_time: Time.at(otp_itin["endTime"].to_i/1000).in_time_zone,
