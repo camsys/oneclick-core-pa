@@ -66,7 +66,10 @@ module OTP
             itineraries {
               startTime
               endTime
+              duration
               walkTime
+              waitingTime
+              walkDistance
               fares {
                 type
                 cents
