@@ -50,7 +50,6 @@ module OTP
     # arrive_by should be a boolean
     # Accepts a hash of additional options, none of which are required to make the plan call run
     def plan(from, to, trip_datetime, arrive_by = true, options = {})
-      # Build the GraphQL endpoint URL
       url = "https://hopelink-otp.ibi-transit.com/otp/routers/default/index/graphql"
     
       # Define the GraphQL query
@@ -147,14 +146,18 @@ module OTP
       Rails.logger.info("Sending GraphQL request with URL: #{url}")
       Rails.logger.info("Request body: #{body}")
     
-      # Make the GraphQL request
-      response = make_graphql_request(url, body, headers)
+      # Make the GraphQL request and assign the response to `resp`
+      resp = make_graphql_request(url, body, headers)
     
-      # Log the response
-      Rails.logger.info("GraphQL response: #{response.body}")
+      # Log the raw response
+      Rails.logger.info("GraphQL response: #{resp.body}")
     
-      # Parse and return the JSON response
-      JSON.parse(response.body)
+      # Return `resp` directly, as other parts of your code expect it
+      resp
+    rescue => e
+      # Log and return an error message in `resp` format
+      Rails.logger.error("GraphQL request failed with error: #{e}")
+      OpenStruct.new(body: { 'id' => 500, 'msg' => e.to_s }.to_json)
     end
    
     # Helper method to make the GraphQL request
