@@ -250,14 +250,19 @@ class OTPAmbassador
     else
       Rails.logger.info("Calculating transit time for trip type: #{trip_type}")
 
+      # Define acceptable transit modes
+      transit_modes = ["TRANSIT", "BUS", "TRAM", "RAIL", "SUBWAY", "FERRY"]
+
       # Initialize total transit time
       total_transit_time = 0
 
       otp_itin["legs"].each do |leg|
         Rails.logger.info("Leg mode: #{leg['mode']}")
-        if leg["mode"] == "TRANSIT"
-          leg_duration = (leg["endTime"] - leg["startTime"]) / 1000 # milliseconds to seconds
-          Rails.logger.info("Transit leg found with startTime: #{leg['startTime']}, endTime: #{leg['endTime']}, duration (s): #{leg_duration}")
+        if transit_modes.include?(leg["mode"])
+          start_time = leg["from"]["departureTime"]
+          end_time = leg["to"]["arrivalTime"]
+          leg_duration = (end_time - start_time) / 1000 # milliseconds to seconds
+          Rails.logger.info("Transit leg found with startTime: #{start_time}, endTime: #{end_time}, duration (s): #{leg_duration}")
           total_transit_time += leg_duration
         else
           Rails.logger.info("Non-transit leg skipped with mode: #{leg['mode']}")
