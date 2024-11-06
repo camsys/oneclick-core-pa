@@ -242,14 +242,30 @@ class OTPAmbassador
     end
   end  
 
-  # Calculates the total time spent on transit legs
+  # Calculates the total time spent on transit legs with logger statements for debugging
   def get_transit_time(otp_itin, trip_type)
     if trip_type.in? [:car, :bicycle]
-      otp_itin["walkTime"]
+      Rails.logger.info("Trip type is #{trip_type}, returning walkTime: #{otp_itin['walkTime']}")
+      return otp_itin["walkTime"]
     else
-      otp_itin["legs"]
-        .select { |leg| leg["mode"] == "TRANSIT" }
-        .sum { |leg| (leg["endTime"] - leg["startTime"]) / 1000 } # Converts milliseconds to seconds
+      Rails.logger.info("Calculating transit time for trip type: #{trip_type}")
+
+      # Initialize total transit time
+      total_transit_time = 0
+
+      otp_itin["legs"].each do |leg|
+        Rails.logger.info("Leg mode: #{leg['mode']}")
+        if leg["mode"] == "TRANSIT"
+          leg_duration = (leg["endTime"] - leg["startTime"]) / 1000 # milliseconds to seconds
+          Rails.logger.info("Transit leg found with startTime: #{leg['startTime']}, endTime: #{leg['endTime']}, duration (s): #{leg_duration}")
+          total_transit_time += leg_duration
+        else
+          Rails.logger.info("Non-transit leg skipped with mode: #{leg['mode']}")
+        end
+      end
+
+      Rails.logger.info("Total transit time calculated: #{total_transit_time} seconds")
+      return total_transit_time
     end
   end
 
