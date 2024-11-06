@@ -242,12 +242,14 @@ class OTPAmbassador
     end
   end  
 
-  # OTP Lists Car and Walk as having 0 transit time
+  # Calculates the total time spent on transit legs
   def get_transit_time(otp_itin, trip_type)
     if trip_type.in? [:car, :bicycle]
-      return otp_itin["walkTime"]
+      otp_itin["walkTime"]
     else
-      return otp_itin["transitTime"]
+      otp_itin["legs"]
+        .select { |leg| leg["mode"] == "TRANSIT" }
+        .sum { |leg| (leg["endTime"] - leg["startTime"]) / 1000 } # Converts milliseconds to seconds
     end
   end
 
