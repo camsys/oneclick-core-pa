@@ -182,7 +182,6 @@ class OTPAmbassador
     }
   end
 
-
   # Modifies OTP Itin's legs, inserting information about 1-Click services
   def associate_legs_with_services(otp_itin)
     otp_itin.legs ||= []
