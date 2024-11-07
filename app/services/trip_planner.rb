@@ -388,5 +388,4 @@ class TripPlanner
     @router.get_itineraries(trip_type).map {|i| Itinerary.new(i)}
   end
 
-
 end

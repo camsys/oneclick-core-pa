@@ -225,7 +225,7 @@ class OTPAmbassador
     end
   end  
 
-  # Calculates the total time spent on transit legs with logger statements for debugging
+  # OTP Lists Car and Walk as having 0 transit time
   def get_transit_time(otp_itin, trip_type)
     if trip_type.in? [:car, :bicycle]
       return otp_itin["walkTime"]
@@ -252,6 +252,7 @@ class OTPAmbassador
     return otp_itin["walkDistance"]
   end
 
+  # Extracts cost from OTP itinerary
   def extract_cost(otp_itin, trip_type)
     # OTP returns a nil cost for walk trips.  nil means unknown, so it should be zero instead
     case trip_type
@@ -263,7 +264,6 @@ class OTPAmbassador
 
     otp_itin.fare_in_dollars
   end
-  
 
   # Extracts total distance from OTP itinerary
   # default conversion factor is for converting meters to miles
