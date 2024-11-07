@@ -231,22 +231,34 @@ class OTPAmbassador
   end
 
   def get_associated_service_for(leg)
-    svc = nil
     leg ||= {}
     gtfs_agency_id = leg['agencyId']
     gtfs_agency_name = leg['agencyName']
   
+    # Log the agency details for debugging
+    Rails.logger.info("Attempting to associate service for leg: agencyId=#{gtfs_agency_id}, agencyName=#{gtfs_agency_name}")
+  
     # If gtfs_agency_id is not nil, first attempt to find the service by its GTFS agency ID.
-    svc ||= Service.find_by(gtfs_agency_id: gtfs_agency_id) if gtfs_agency_id
+    svc = Service.find_by(gtfs_agency_id: gtfs_agency_id) if gtfs_agency_id
+    Rails.logger.info("Service found by agency ID: #{svc.inspect}") if svc
   
     if svc
-      # If a service is found by ID, we need to check if it's within the list of permitted services.
-      return @services.detect { |s| s.id == svc.id }
+      # If a service is found by ID, check if it's within the list of permitted services.
+      matched_service = @services.detect { |s| s.id == svc.id }
+      Rails.logger.info("Matched permitted service by agency ID: #{matched_service.inspect}")
+      return matched_service
     else
-      # If we didn't find a service by its ID, and if gtfs_agency_name is not nil, then we try to find a service by its GTFS agency name.
-      return @services.find_by(name: gtfs_agency_name) if gtfs_agency_name
+      # If no service is found by GTFS ID, try finding it by the GTFS agency name.
+      svc = Service.find_by(name: gtfs_agency_name) if gtfs_agency_name
+      Rails.logger.info("Service found by agency name: #{svc.inspect}") if svc
+  
+      # Check if the found service by name is in the permitted list
+      matched_service = @services.detect { |s| s.id == svc.id } if svc
+      Rails.logger.info("Matched permitted service by agency name: #{matched_service.inspect}")
+      return matched_service
     end
-  end  
+  end
+   
 
   # Calculates the total time spent on transit legs with logger statements for debugging
   def get_transit_time(otp_itin, trip_type)
