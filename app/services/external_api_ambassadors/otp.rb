@@ -86,7 +86,16 @@ module OTP
               }
               legs {
                 mode
-                distance      
+                distance
+                route { 
+                  gtfsId
+                  shortName
+                  longName
+                  agency {
+                    gtfsId
+                    name
+                  }
+                }
                 from {
                   name
                   lat
@@ -122,6 +131,7 @@ module OTP
           }
         }
       GRAPHQL
+    
     
       # Define variables for the GraphQL query
       variables = {
