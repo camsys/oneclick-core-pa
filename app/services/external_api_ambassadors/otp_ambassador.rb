@@ -171,6 +171,7 @@ class OTPAmbassador
 
   # Converts an OTP itinerary hash into a set of 1-Click itinerary attributes
   def convert_itinerary(otp_itin, trip_type)
+    Rails.logger.info "oto_itin before anything else: #{otp_itin}"
     # Associate legs with services, directly accessing legs from the hash
     otp_itin["legs"] ||= []
     associate_legs_with_services(otp_itin)
