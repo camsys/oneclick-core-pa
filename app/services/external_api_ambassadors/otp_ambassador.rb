@@ -231,6 +231,7 @@ class OTPAmbassador
       return otp_itin["walkTime"]
     else
       return otp_itin["transitTime"]
+      Rails.logger.info "Transit Time: #{otp_itin["transitTime"]}"
     end
   end
 
