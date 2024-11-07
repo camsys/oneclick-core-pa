@@ -176,7 +176,7 @@ class OTPAmbassador
     otp_itin["legs"] ||= []
     associate_legs_with_services(otp_itin)
   
-    Rails.logger.info "otp_itin: #{otp_itin}"
+    Rails.logger.info "otp_itin after associating legs with services: #{otp_itin}"
   
     # Check for invalid legs directly within the legs array
     itin_has_invalid_leg = otp_itin["legs"].detect { |leg| leg['serviceName'] && leg['serviceId'].nil? }
@@ -206,7 +206,7 @@ class OTPAmbassador
 
   # Modifies OTP Itin's legs, inserting information about 1-Click services
   def associate_legs_with_services(otp_itin)
-    Rails.logger.info "otp_itin: #{otp_itin}"
+    Rails.logger.info "otp_itin before associated with services: #{otp_itin}"
     
     otp_itin["legs"] ||= []  
     otp_itin["legs"].map! do |leg|
