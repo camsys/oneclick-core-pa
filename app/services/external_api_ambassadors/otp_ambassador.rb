@@ -171,30 +171,36 @@ class OTPAmbassador
 
   # Converts an OTP itinerary hash into a set of 1-Click itinerary attributes
   def convert_itinerary(otp_itin, trip_type)
+    # Associate legs with services, directly accessing legs from the hash
+    otp_itin["legs"] ||= []
     associate_legs_with_services(otp_itin)
+  
     Rails.logger.info "otp_itin: #{otp_itin}"
-    itin_has_invalid_leg = otp_itin.legs.detect{ |leg| 
-      leg['serviceName'] && leg['serviceId'].nil?
-    }
+  
+    # Check for invalid legs directly within the legs array
+    itin_has_invalid_leg = otp_itin["legs"].detect { |leg| leg['serviceName'] && leg['serviceId'].nil? }
     return nil if itin_has_invalid_leg
-
-    service_id = otp_itin.legs
-                          .detect{ |leg| leg['serviceId'].present? }
-                          &.fetch('serviceId', nil)
-
-    return {
-      start_time: Time.at(otp_itin["startTime"].to_i/1000).in_time_zone,
-      end_time: Time.at(otp_itin["endTime"].to_i/1000).in_time_zone,
+  
+    # Get the first valid service ID in the legs array
+    service_id = otp_itin["legs"]
+                    .detect { |leg| leg['serviceId'].present? }
+                    &.fetch('serviceId', nil)
+  
+    # Construct the itinerary hash, accessing legs directly from the hash
+    {
+      start_time: Time.at(otp_itin["startTime"].to_i / 1000).in_time_zone,
+      end_time: Time.at(otp_itin["endTime"].to_i / 1000).in_time_zone,
       transit_time: get_transit_time(otp_itin, trip_type),
       walk_time: get_walk_time(otp_itin, trip_type),
       wait_time: get_wait_time(otp_itin),
       walk_distance: get_walk_distance(otp_itin),
       cost: extract_cost(otp_itin, trip_type),
-      legs: otp_itin.legs.to_a,
-      trip_type: trip_type, #TODO: Make this smarter
+      legs: otp_itin["legs"], # Access legs as an array
+      trip_type: trip_type,
       service_id: service_id
     }
   end
+  
 
 
   # Modifies OTP Itin's legs, inserting information about 1-Click services
