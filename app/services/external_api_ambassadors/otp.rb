@@ -20,29 +20,36 @@ module OTP
     # Makes multiple OTP requests in parallel, and returns once they're all done.
     # Send it a list or array of request hashes.
     def multi_plan(*requests)
-      requests = requests.flatten.uniq {|req| req[:label]} # Discard any requests with duplicate labels
+      requests = requests.flatten.uniq { |req| req[:label] } # Discard any requests with duplicate labels
       responses = nil
       EM.run do
         multi = EM::MultiRequest.new
         requests.each_with_index do |request, i|
-          url = plan_url(request)
-          multi.add (request[:label] || "req#{i}".to_sym), EM::HttpRequest.new(url, connect_timeout: 60, inactivity_timeout: 60, tls: {verify_peer: true}).get
+                    url = plan_url(request)
+                    body = build_url(request[:from], request[:to], request[:trip_time], request[:arrive_by], request[:options] || {})
+
+                    multi.add(
+                      (request[:label] || "req#{i}".to_sym),
+                      EM::HttpRequest.new(url, connect_timeout: 60, inactivity_timeout: 60, tls: { verify_peer: true })
+                                      .post(
+                                        head: { 'Content-Type' => 'application/json' },
+                                        body: body
+                                      )
+                    )
         end
 
-        responses = nil
         multi.callback do
           EM.stop
-          responses = multi.responses 
+          responses = multi.responses
         end
       end
 
-      return responses
-
+      responses
     end
 
     # Constructs an OTP request url
     def plan_url(request)
-      build_url(request[:from], request[:to], request[:trip_time], request[:arrive_by], request[:options] || {})
+      "#{@base_url}/index/graphql"
     end
 
     ###
@@ -188,98 +195,91 @@ module OTP
     end
 
     def build_url(from, to, trip_datetime, arrive_by, options={})
-      # Set Default Options
-      arrive_by = arrive_by.nil? ? true : arrive_by
-      mode = options[:mode] || "TRANSIT,WALK"
-      wheelchair = options[:wheelchair] || "false"
-      walk_speed = options[:walk_speed] || 3.0 #walk_speed is defined in MPH and converted to m/s before going to OTP
-      max_walk_distance = options[:max_walk_distance] || 2 #max_walk_distance is defined in miles and converted to meters before going to OTP v1
-      max_bicycle_distance = options[:max_bicycle_distance] || 5
-      optimize = options[:optimize] || 'QUICK'
-      num_itineraries = options[:num_itineraries] || Config.otp_itinerary_quantity
-      min_transfer_time = options[:min_transfer_time] || nil
-      max_transfer_time = options[:max_transfer_time] || nil
-      banned_routes = options[:banned_routes] || nil
-      preferred_routes = options[:preferred_routes] || nil
+      # Define the GraphQL query
+      query = <<-GRAPHQL
+        query($fromLat: Float!, $fromLon: Float!, $toLat: Float!, $toLon: Float!, $date: String!, $time: String!) {
+          plan(
+            from: { lat: $fromLat, lon: $fromLon }
+            to: { lat: $toLat, lon: $toLon }
+            date: $date
+            time: $time
+            transportModes: [{ mode: TRANSIT }, { mode: WALK }]
+          ) {
+            itineraries {
+              startTime
+              endTime
+              duration
+              walkDistance
+              fares {
+                type
+                cents
+                currency
+                components {
+                  fareId
+                  currency
+                  cents
+                  routes {
+                    gtfsId
+                    shortName
+                  }
+                }
+              }
+              legs {
+                mode
+                distance
+                from {
+                  name
+                  lat
+                  lon
+                  departureTime
+                }
+                to {
+                  name
+                  lat
+                  lon
+                  arrivalTime
+                }
+                fareProducts {
+                  id
+                  product {
+                    name
+                    ... on DefaultFareProduct {
+                      price {
+                        amount
+                        currency {
+                          code
+                          digits
+                        }
+                      }
+                    }
+                    riderCategory {
+                      name
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      GRAPHQL
 
-      walk_reluctance = options[:walk_reluctance] || Config.walk_reluctance
-      bike_reluctance = options[:bike_reluctance] || Config.bike_reluctance
-      wait_reluctance = options[:wait_reluctance]
+      # Define variables for the GraphQL query
+      variables = {
+        fromLat: from[0].to_f,
+        fromLon: from[1].to_f,
+        toLat: to[0].to_f,
+        toLon: to[1].to_f,
+        date: trip_datetime.strftime("%Y-%m-%d"),
+        time: trip_datetime.strftime("%H:%M")
+      }
 
-      #Parameters
-      time = trip_datetime.strftime("%-I:%M%p")
-      date = trip_datetime.strftime("%Y-%m-%d")
-
-      plan_url = @base_url + '/plan?'
-
-      url_options = "&time=" + time
-      url_options += "&mode=" + mode + "&date=" + date
-      url_options += "&toPlace=" + to[0].to_s + ',' + to[1].to_s + "&fromPlace=" + from[0].to_s + ',' + from[1].to_s
-      url_options += "&wheelchair=" + wheelchair.to_s
-      url_options += "&arriveBy=" + arrive_by.to_s
-      url_options += "&walkSpeed=" + (0.44704*walk_speed).to_s
-      url_options += "&showIntermediateStops=" + "true"
-      url_options += "&showStopTimes=" + "true"
-      url_options += "&showNextFromDeparture=true"
-
-      if banned_routes
-        url_options += "&bannedRoutes=" + banned_routes
-      end
-
-      if preferred_routes
-        url_options += "&preferredRoutes=" + preferred_routes
-        url_options += "&otherThanPreferredRoutesPenalty=7200"#VERY High penalty for not using the preferred route
-      end
-
-      unless min_transfer_time.nil?
-        url_options += "&minTransferTime=" + min_transfer_time.to_s
-      end
-
-      # v2 doesn't like max* fields in favor of *reluctance fields
-      # reluctance fields are also in v1 but we only use them in v2 here
-      if @version == 'v2'
-        if mode == "TRANSIT,BICYCLE" or mode == "BICYCLE"
-          unless bike_reluctance.nil?
-            url_options += "&bikeReluctance=" + bike_reluctance.to_s
-          end
-        else
-          unless walk_reluctance.nil?
-            url_options += "&walkReluctance=" + walk_reluctance.to_s
-          end
-        end
-      else
-        unless max_transfer_time.nil?
-          url_options += "&maxTransferTime=" + max_transfer_time.to_s
-        end
-
-        # If it's a bicycle trip, OTP uses walk distance as the bicycle distance
-        if mode == "TRANSIT,BICYCLE" or mode == "BICYCLE"
-          url_options += "&maxWalkDistance=" + (1609.34*(max_bicycle_distance || 5.0)).to_s
-        else
-          url_options += "&maxWalkDistance=" + (1609.34*max_walk_distance).to_s
-        end
-      end
-
-      unless wait_reluctance.nil?
-        url_options += "&waitReluctance=" + wait_reluctance.to_s
-      end
-
-      url_options += "&numItineraries=" + num_itineraries.to_s
-
-      # Unless the optimiziton = QUICK (which is the default), set additional parameters
-      case optimize.downcase
-      when 'walking'
-        url_options += "&walkReluctance=" + "20"
-      when 'transfers'
-        url_options += "&transferPenalty=" + "1800"
-      end
-
-      url = plan_url + url_options
-
-      Rails.logger.info url
-
-      return url
+      # Return the JSON body that includes the query and variables
+      {
+        query: query,
+        variables: variables
+      }.to_json
     end
+
 
     def last_built
       url = @base_url
