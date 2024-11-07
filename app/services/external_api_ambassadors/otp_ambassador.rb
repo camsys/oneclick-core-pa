@@ -184,6 +184,7 @@ class OTPAmbassador
 
   # Modifies OTP Itin's legs, inserting information about 1-Click services
   def associate_legs_with_services(otp_itin)
+    Rails.logger.info "otp_itin: #{otp_itin}"
     otp_itin.legs ||= []
     otp_itin.legs = otp_itin.legs.map do |leg|
       svc = get_associated_service_for(leg)
@@ -212,6 +213,8 @@ class OTPAmbassador
     leg ||= {}
     gtfs_agency_id = leg['agencyId']
     gtfs_agency_name = leg['agencyName']
+
+    Rails.logger.debug "Looking for service with GTFS agency ID: #{gtfs_agency_id} and GTFS agency name: #{gtfs_agency_name}"
   
     # If gtfs_agency_id is not nil, first attempt to find the service by its GTFS agency ID.
     svc ||= Service.find_by(gtfs_agency_id: gtfs_agency_id) if gtfs_agency_id
