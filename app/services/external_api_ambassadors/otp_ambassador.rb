@@ -209,47 +209,47 @@ class OTPAmbassador
     
     otp_itin["legs"] ||= []  
     otp_itin["legs"].map! do |leg|
-      svc = get_associated_service_for(leg)
-
-      # double check if its paratransit but not set to that mode
+      # Extract agency details from the nested structure within `route`
+      agency_id = leg.dig("route", "agency", "gtfsId")
+      agency_name = leg.dig("route", "agency", "name")
+  
+      # Pass the extracted agency details to the service lookup function
+      svc = get_associated_service_for(agency_id, agency_name)
+  
+      # Adjust the mode if it's paratransit and not set correctly
       if !leg['mode'].include?('FLEX') && leg['boardRule'] == 'mustPhone'
         leg['mode'] = 'FLEX_ACCESS'
       end
-
+  
       if svc
         leg['serviceId'] = svc.id
         leg['serviceName'] = svc.name
-        leg['serviceFareInfo'] = svc.url  # Should point to service's fare_info_url, but we don't have that yet
+        leg['serviceFareInfo'] = svc.url
         leg['serviceLogoUrl'] = svc.full_logo_url
         leg['serviceFullLogoUrl'] = svc.full_logo_url(nil) # actual size
       else
-        leg['serviceName'] = leg['agencyName'] || leg['agencyId']
+        leg['serviceName'] = agency_name || agency_id
       end
-
+  
       leg
     end
   end
-
-  def get_associated_service_for(leg)
-    leg ||= {}
-    gtfs_agency_id = leg['agencyId']
-    gtfs_agency_name = leg['agencyName']
   
-    # Log the agency details for debugging
-    Rails.logger.info("Attempting to associate service for leg: agencyId=#{gtfs_agency_id}, agencyName=#{gtfs_agency_name}")
-  
-    # If gtfs_agency_id is not nil, first attempt to find the service by its GTFS agency ID.
-    svc = Service.find_by(gtfs_agency_id: gtfs_agency_id) if gtfs_agency_id
+  def get_associated_service_for(agency_id, agency_name)
+    Rails.logger.info("Attempting to associate service for agencyId=#{agency_id}, agencyName=#{agency_name}")
+    
+    # Attempt to find the service by GTFS agency ID first
+    svc = Service.find_by(gtfs_agency_id: agency_id) if agency_id
     Rails.logger.info("Service found by agency ID: #{svc.inspect}") if svc
   
     if svc
-      # If a service is found by ID, check if it's within the list of permitted services.
+      # Ensure the service is within the list of permitted services
       matched_service = @services.detect { |s| s.id == svc.id }
       Rails.logger.info("Matched permitted service by agency ID: #{matched_service.inspect}")
       return matched_service
-    else
-      # If no service is found by GTFS ID, try finding it by the GTFS agency name.
-      svc = Service.find_by(name: gtfs_agency_name) if gtfs_agency_name
+    elsif agency_name
+      # If no service found by ID, try finding it by agency name
+      svc = Service.find_by(name: agency_name)
       Rails.logger.info("Service found by agency name: #{svc.inspect}") if svc
   
       # Check if the found service by name is in the permitted list
