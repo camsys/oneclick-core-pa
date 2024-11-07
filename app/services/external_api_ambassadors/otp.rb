@@ -66,8 +66,6 @@ module OTP
               startTime
               endTime
               duration
-              walkTime
-              waitingTime
               walkDistance
               fares {
                 type
