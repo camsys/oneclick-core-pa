@@ -204,6 +204,7 @@ class OTPAmbassador
         leg['serviceName'] = (leg['agencyName'] || leg['agencyId'])
       end
 
+      Rails.logger.info "leg: #{leg}"
       leg
     end
   end
