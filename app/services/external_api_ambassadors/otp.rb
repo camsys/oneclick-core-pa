@@ -52,7 +52,7 @@ module OTP
     def plan(from, to, trip_datetime, arrive_by = true, options = {})
       # Build the GraphQL endpoint URL
       url = "https://hopelink-otp.ibi-transit.com/otp/routers/default/index/graphql"
-    
+      Rails.logger.info("URL: #{url}")
       # Define the GraphQL query
       query = <<-GRAPHQL
         query($fromLat: Float!, $fromLon: Float!, $toLat: Float!, $toLon: Float!, $date: String!, $time: String!) {
