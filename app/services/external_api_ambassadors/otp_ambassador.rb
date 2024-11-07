@@ -227,12 +227,7 @@ class OTPAmbassador
 
   # OTP Lists Car and Walk as having 0 transit time
   def get_transit_time(otp_itin, trip_type)
-    if trip_type.in? [:car, :bicycle]
-      return otp_itin["walkTime"]
-    else
-      return otp_itin["transitTime"]
-      Rails.logger.info "Transit Time: #{otp_itin["transitTime"]}"
-    end
+   # do nothing
   end
 
   # OTP returns car and bicycle time as walk time
