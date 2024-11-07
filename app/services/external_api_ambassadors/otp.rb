@@ -86,9 +86,7 @@ module OTP
               }
               legs {
                 mode
-                distance
-                agencyName
-                agencyId        
+                distance      
                 from {
                   name
                   lat
