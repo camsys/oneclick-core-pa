@@ -19,23 +19,24 @@ module OTP
 
     # Makes multiple OTP requests in parallel, and returns once they're all done.
     # Send it a list or array of request hashes.
+
     def multi_plan(*requests)
-      requests = requests.flatten.uniq { |req| req[:label] } # Discard any requests with duplicate labels
+      requests = requests.flatten.uniq { |req| req[:label] } # Discard duplicate labels
       responses = nil
       EM.run do
         multi = EM::MultiRequest.new
         requests.each_with_index do |request, i|
-                    url = plan_url(request)
-                    body = build_url(request[:from], request[:to], request[:trip_time], request[:arrive_by], request[:options] || {})
+          url = plan_url(request) # GraphQL endpoint
+          body = build_url(request[:from], request[:to], request[:trip_time], request[:arrive_by], request[:options] || {})
 
-                    multi.add(
-                      (request[:label] || "req#{i}".to_sym),
-                      EM::HttpRequest.new(url, connect_timeout: 60, inactivity_timeout: 60, tls: { verify_peer: true })
-                                      .post(
-                                        head: { 'Content-Type' => 'application/json' },
-                                        body: body
-                                      )
-                    )
+          multi.add(
+            (request[:label] || "req#{i}".to_sym),
+            EM::HttpRequest.new(url, connect_timeout: 60, inactivity_timeout: 60, tls: { verify_peer: true })
+                            .post(
+                              head: { 'Content-Type' => 'application/json' },
+                              body: body
+                            )
+          )
         end
 
         multi.callback do
@@ -43,7 +44,6 @@ module OTP
           responses = multi.responses
         end
       end
-
       responses
     end
 
@@ -194,90 +194,76 @@ module OTP
       }
     end
 
-    def build_url(from, to, trip_datetime, arrive_by, options={})
-      # Define the GraphQL query
-      query = <<-GRAPHQL
-        query($fromLat: Float!, $fromLon: Float!, $toLat: Float!, $toLon: Float!, $date: String!, $time: String!) {
-          plan(
-            from: { lat: $fromLat, lon: $fromLon }
-            to: { lat: $toLat, lon: $toLon }
-            date: $date
-            time: $time
-            transportModes: [{ mode: TRANSIT }, { mode: WALK }]
-          ) {
-            itineraries {
-              startTime
-              endTime
-              duration
-              walkDistance
-              fares {
-                type
-                cents
-                currency
-                components {
-                  fareId
-                  currency
-                  cents
-                  routes {
-                    gtfsId
-                    shortName
-                  }
-                }
+    def build_url(from, to, trip_datetime, arrive_by = true, options = {})
+    query = <<-GRAPHQL
+      query($fromLat: Float!, $fromLon: Float!, $toLat: Float!, $toLon: Float!, $date: String!, $time: String!, $mode: [TransportModeInput!], $wheelchair: Boolean, $walkSpeed: Float, $maxWalkDistance: Float) {
+        plan(
+          from: { lat: $fromLat, lon: $fromLon }
+          to: { lat: $toLat, lon: $toLon }
+          date: $date
+          time: $time
+          arriveBy: #{arrive_by}
+          transportModes: $mode
+          wheelchair: $wheelchair
+          walkSpeed: $walkSpeed
+          maxWalkDistance: $maxWalkDistance
+        ) {
+          itineraries {
+            startTime
+            endTime
+            duration
+            walkDistance
+            fares {
+              type
+              cents
+              currency
+            }
+            legs {
+              mode
+              distance
+              from {
+                name
+                lat
+                lon
+                departureTime
               }
-              legs {
-                mode
-                distance
-                from {
-                  name
-                  lat
-                  lon
-                  departureTime
-                }
-                to {
-                  name
-                  lat
-                  lon
-                  arrivalTime
-                }
-                fareProducts {
-                  id
-                  product {
-                    name
-                    ... on DefaultFareProduct {
-                      price {
-                        amount
-                        currency {
-                          code
-                          digits
-                        }
-                      }
-                    }
-                    riderCategory {
-                      name
-                    }
-                  }
-                }
+              to {
+                name
+                lat
+                lon
+                arrivalTime
               }
             }
           }
         }
-      GRAPHQL
+    GRAPHQL
 
-      # Define variables for the GraphQL query
-      variables = {
-        fromLat: from[0].to_f,
-        fromLon: from[1].to_f,
-        toLat: to[0].to_f,
-        toLon: to[1].to_f,
-        date: trip_datetime.strftime("%Y-%m-%d"),
-        time: trip_datetime.strftime("%H:%M")
-      }
+    # Default and optional settings based on options provided
+    mode = options[:mode] || ["TRANSIT", "WALK"]
+    wheelchair = options[:wheelchair] || false
+    walk_speed = options[:walk_speed] || 1.34 # Convert 3 mph to m/s as per GraphQL API needs
+    max_walk_distance = (options[:max_walk_distance] || 2) * 1609.34 # Convert miles to meters
 
-      # Return the JSON body that includes the query and variables
-      {
-        query: query,
-        variables: variables
-      }.to_json
+    # Define variables for the GraphQL query
+    variables = {
+      fromLat: from[0].to_f,
+      fromLon: from[1].to_f,
+      toLat: to[0].to_f,
+      toLon: to[1].to_f,
+      date: trip_datetime.strftime("%Y-%m-%d"),
+      time: trip_datetime.strftime("%H:%M"),
+      mode: mode.map { |m| { mode: m } },
+      wheelchair: wheelchair,
+      walkSpeed: walk_speed,
+      maxWalkDistance: max_walk_distance
+    }
+
+    # Log the generated query and variables for debugging
+    Rails.logger.info("Generated GraphQL query: #{query}")
+    Rails.logger.info("With variables: #{variables}")
+
+    # Return the JSON body that includes the query and variables
+      { query: query, variables: variables }.to_json
     end
 
 
