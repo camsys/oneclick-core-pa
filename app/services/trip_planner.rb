@@ -384,8 +384,7 @@ class TripPlanner
   end
 
   # Generic OTP Call
-  def build_fixed_itineraries trip_type
-    Rails.logger "Running build_fixed_itineraries"
+  def build_fixed_itineraries(trip_type)
     @router.get_itineraries(trip_type).map {|i| Itinerary.new(i)}
   end
 
