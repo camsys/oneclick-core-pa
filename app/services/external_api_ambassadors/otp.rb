@@ -14,6 +14,7 @@ module OTP
     def initialize(base_url="", version="v1")
       @base_url = base_url
       @version = version
+      Rails.logger.info "OTPService initialized with base_url: #{@base_url} and version: #{@version}"
     end
 
     # Makes multiple OTP requests in parallel, and returns once they're all done.
