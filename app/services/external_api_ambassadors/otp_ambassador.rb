@@ -234,6 +234,8 @@ class OTPAmbassador
       return otp_itin["transitTime"]
       Rails.logger.info "Transit Time: #{otp_itin["transitTime"]}"
     end
+    Rails.logger.info "Transit Time: #{otp_itin["transitTime"]}"
+    Rails.logger.info "Walk Time: #{otp_itin["walkTime"]}"
   end
 
   # OTP returns car and bicycle time as walk time
