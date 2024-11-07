@@ -172,7 +172,6 @@ class OTPAmbassador
       start_time: Time.at(otp_itin["startTime"].to_i/1000).in_time_zone,
       end_time: Time.at(otp_itin["endTime"].to_i/1000).in_time_zone,
       transit_time: get_transit_time(otp_itin, trip_type),
-      Rails.logger.info "Transit Time: #{otp_itin["transitTime"]}",
       walk_time: get_walk_time(otp_itin, trip_type),
       wait_time: get_wait_time(otp_itin),
       walk_distance: get_walk_distance(otp_itin),
