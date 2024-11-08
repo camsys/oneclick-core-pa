@@ -1013,23 +1013,28 @@ class EcolaneAmbassador < BookingAmbassador
     agency = @user&.transportation_agency
     service = @service
   
-    # Log initial presence check for required components
+    # Check required components and log missing ones
     unless @user && agency && service
       Rails.logger.info "Missing required components: #{@user ? '' : 'user, '}#{agency ? '' : 'agency, '}#{service ? '' : 'service, '}"
       return []
     end
     Rails.logger.info "User: #{@user.id}, Agency: #{agency.id}, Service: #{service.id}"
   
-    # Define origin and destination coordinates
-    origin = { lat: @outbound_trip&.origin&.lat, lng: @outbound_trip&.origin&.lng }
-    destination = { lat: @outbound_trip&.destination&.lat, lng: @outbound_trip&.destination&.lng }
-  
-    # Log origin and destination coordinates check
-    unless origin[:lat] && origin[:lng] && destination[:lat] && destination[:lng]
-      Rails.logger.info "Missing coordinates for origin or destination. Origin: #{origin}, Destination: #{destination}"
+    # Attempt to set origin and destination
+    if @outbound_trip
+      origin = { lat: @outbound_trip.origin&.lat, lng: @outbound_trip.origin&.lng }
+      destination = { lat: @outbound_trip.destination&.lat, lng: @outbound_trip.destination&.lng }
+      Rails.logger.info "Outbound Trip Origin: #{origin}, Destination: #{destination}"
+    else
+      Rails.logger.info "Outbound trip is missing. Unable to retrieve origin and destination."
       return []
     end
-    Rails.logger.info "Origin: #{origin}, Destination: #{destination}"
+  
+    # Verify if coordinates were successfully retrieved
+    if origin[:lat].nil? || origin[:lng].nil? || destination[:lat].nil? || destination[:lng].nil?
+      Rails.logger.info "Incomplete coordinates. Origin: #{origin}, Destination: #{destination}."
+      return []
+    end
   
     # Prepare query params for finding travel patterns
     query_params = {
@@ -1040,11 +1045,11 @@ class EcolaneAmbassador < BookingAmbassador
     }
     Rails.logger.info "Query params for travel patterns: #{query_params}"
   
-    # Retrieve valid travel patterns based on origin and destination
+    # Retrieve valid travel patterns based on the parameters
     valid_travel_patterns = TravelPattern.available_for(query_params)
     Rails.logger.info "Valid travel patterns found: #{valid_travel_patterns.map(&:id)}"
   
-    # Gather the funding sources associated with these travel patterns
+    # Gather funding sources associated with these travel patterns
     verified_funding_sources = FundingSource.joins(:travel_patterns)
                                             .where(travel_patterns: { id: valid_travel_patterns.map(&:id) })
                                             .where(agency_id: agency.id)
@@ -1060,7 +1065,8 @@ class EcolaneAmbassador < BookingAmbassador
     end
   
     verified_funding_sources
-  end  
+  end
+  
   
   
 
