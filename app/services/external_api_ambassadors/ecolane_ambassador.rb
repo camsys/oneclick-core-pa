@@ -544,6 +544,12 @@ class EcolaneAmbassador < BookingAmbassador
   
       # Skip if valid_from is more than the greater of 59 days or maximum booking notice into the future
       next if valid_from && valid_from > current_date + [59, max_booking_notice_days].max.days
+
+      permitted_funding_sources = get_travel_pattern_funding_sources
+      unless permitted_funding_sources.include?(funding_source["name"].strip)
+        Rails.logger.info "Skipping funding source: #{funding_source["name"].strip} (not permitted)"
+        next
+      end
   
       if not @use_ecolane_rules and not funding_source["name"].strip.in? @preferred_funding_sources
         next 
