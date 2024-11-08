@@ -98,10 +98,15 @@ class TravelPattern < ApplicationRecord
         end
       end
   
-      Rails.logger.info "Final valid patterns: #{valid_patterns.map(&:id)}"
+      Rails.logger.info("Filtering travel patterns by funding source before purpose selection")
+      valid_patterns = travel_patterns.select do |pattern|
+        Rails.logger.info "Checking Travel Pattern ID: #{pattern.id} for valid funding sources"
+        pattern.funding_sources.any? { |fs| funding_source_names.include?(fs.name) }
+      end
+      
       if valid_patterns.empty?
-        Rails.logger.info "No valid travel patterns found for origin and destination"
-        raise ActiveRecord::RecordNotFound, "No valid travel patterns found for origin and destination"
+        render json: { status: "error", message: "No valid travel patterns available with eligible funding sources" }, status: 404
+        return
       end
   
       valid_patterns
