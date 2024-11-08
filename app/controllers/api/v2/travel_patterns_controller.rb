@@ -17,69 +17,67 @@ module Api
         Rails.logger.info("Filtering through Travel Patterns with the following filters: #{query_params}")
         travel_patterns = TravelPattern.available_for(query_params)
         if purpose
-          Rails.logger.info("Looking for the valid date range for purpose: #{purpose}")
+          Rails.logger.info("Checking valid date range for purpose: #{purpose}")
           booking_profile = @traveler.booking_profiles.first
+        
           if booking_profile
             begin
               trip_purposes, trip_purposes_hash = booking_profile.booking_ambassador.get_trip_purposes
-              puts "Trip Purposes Count: #{trip_purposes.count}"
-              puts "Trip Purposes Hash Count: #{trip_purposes_hash.count}"
+              Rails.logger.info("Trip Purposes Count: #{trip_purposes.count}")
+              Rails.logger.info("Trip Purposes Hash Count: #{trip_purposes_hash.count}")
             rescue Exception => e
+              Rails.logger.error("Error fetching trip purposes: #{e.message}")
               trip_purposes = []
               trip_purposes_hash = []
             end
+        
+            # Filter trip purposes for the selected purpose and valid date range
             trip_purpose_hash = trip_purposes_hash
               .select { |h| h[:code] == purpose }
               .delete_if { |h| h[:valid_from].nil? }
               .min_by { |h| h[:valid_from] }
-
+        
             if trip_purpose_hash
               valid_from = trip_purpose_hash[:valid_from]
               valid_until = trip_purpose_hash[:valid_until]
-
-              puts "Valid From: #{valid_from}, Valid Until: #{valid_until}"
+              Rails.logger.info("Valid From: #{valid_from}, Valid Until: #{valid_until}")
+            else
+              Rails.logger.info("No valid date range found for purpose: #{purpose}")
             end
           end
-
-          # Now that we have the purpose, cross-reference funding sources and travel patterns
+        
+          # Check travel patterns for matching funding sources
           valid_patterns = travel_patterns.select do |pattern|
-            Rails.logger.info "Checking Travel Pattern ID: #{pattern.id}"
-            Rails.logger.info "Funding sources for travel pattern: #{pattern.funding_sources.pluck(:name)}"
-            Rails.logger.info "Funding sources from Ecolane: #{funding_source_names}"
-
+            Rails.logger.info "Evaluating Travel Pattern ID: #{pattern.id}"
+            Rails.logger.info "Pattern Funding Sources: #{pattern.funding_sources.pluck(:name)}"
+            Rails.logger.info "Funding Sources from Ecolane: #{funding_source_names}"
+        
+            # Cross-reference funding sources
             if pattern.funding_sources.present? && funding_source_names.present?
               match_found = pattern.funding_sources.any? { |fs| funding_source_names.include?(fs.name) }
-              Rails.logger.info "Match found: #{match_found}"
+              Rails.logger.info "Match found in Travel Pattern ID #{pattern.id}: #{match_found}"
               match_found
             else
-              Rails.logger.info "No valid funding sources found for Travel Pattern ID: #{pattern.id}"
+              Rails.logger.info "No valid funding sources for Travel Pattern ID: #{pattern.id}"
               false
             end
           end
-
+        
           if valid_patterns.any?
-            Rails.logger.info("Found the following matching Travel Patterns: #{valid_patterns.map { |t| t['id'] }}")
-            api_response = valid_patterns.map { |pattern| TravelPattern.to_api_response(pattern, service, valid_from, valid_until) }
-            render status: :ok, json: {
-              status: "success",
-              data: api_response
-            }
+            Rails.logger.info("Matching Travel Patterns Found: #{valid_patterns.map(&:id)}")
+            api_response = valid_patterns.map do |pattern|
+              TravelPattern.to_api_response(pattern, service, valid_from, valid_until)
+            end
+            render status: :ok, json: { status: "success", data: api_response }
           else
-            Rails.logger.info("No matching Travel Patterns found")
+            Rails.logger.info("No matching Travel Patterns found for purpose: #{purpose}")
             render fail_response(status: 404, message: "Not found")
           end
         else
-          # If no purpose, just return all available travel patterns without further filtering
-          if travel_patterns.any?
-            api_response = travel_patterns.map { |pattern| TravelPattern.to_api_response(pattern, service) }
-            render status: :ok, json: {
-              status: "success",
-              data: api_response
-            }
-          else
-            render fail_response(status: 404, message: "Not found")
-          end
+          Rails.logger.info("No purpose selected.")
+          render fail_response(status: 400, message: "Purpose required")
         end
+        
       end
       protected
 
