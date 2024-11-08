@@ -1011,19 +1011,27 @@ class EcolaneAmbassador < BookingAmbassador
   ### Returns an empty array if no matches found.
   def get_travel_pattern_funding_sources
     agency = @user&.transportation_agency
-    return [] unless @user && @trip && @outbound_trip && @purpose && @service && agency
+    unless @user && @trip && @outbound_trip && @purpose && @service && agency
+      Rails.logger.info "Missing required components: #{@user ? '' : 'user, '}#{@trip ? '' : 'trip, '}#{@outbound_trip ? '' : 'outbound_trip, '}#{@purpose ? '' : 'purpose, '}#{@service ? '' : 'service, '}#{agency ? '' : 'agency'}"
+      return []
+    end
   
     # Define the origin and destination for the query
     origin = { lat: @outbound_trip.origin&.lat, lng: @outbound_trip.origin&.lng }
     destination = { lat: @outbound_trip.destination&.lat, lng: @outbound_trip.destination&.lng }
+    Rails.logger.info "Origin: #{origin}, Destination: #{destination}"
   
     # Gather funding source names from valid funding source combinations
     funding_source_combinations = valid_funding_source_combinations
+    Rails.logger.info "Funding source combinations: #{funding_source_combinations}"
+    
     funding_source_names = funding_source_combinations.map { |combo| combo[:funding_source] }
+    Rails.logger.info "Funding source names: #{funding_source_names}"
   
     trip_date = @outbound_trip.trip_time.to_date
     start_time = @outbound_trip.trip_time - @outbound_trip.trip_time.midnight
     end_time = @inbound_trip ? @inbound_trip.trip_time - @inbound_trip.trip_time.midnight : nil
+    Rails.logger.info "Trip Date: #{trip_date}, Start Time: #{start_time}, End Time: #{end_time}"
   
     # Prepare query params for finding matching travel patterns
     query_params = {
@@ -1036,9 +1044,11 @@ class EcolaneAmbassador < BookingAmbassador
       start_time: start_time,
       end_time: end_time
     }
+    Rails.logger.info "Query params for travel patterns: #{query_params}"
   
     # Retrieve valid travel patterns based on the parameters
     valid_travel_patterns = TravelPattern.available_for(query_params)
+    Rails.logger.info "Valid travel patterns: #{valid_travel_patterns.map(&:id)}"
   
     # Gather the funding sources associated with these travel patterns
     verified_funding_sources = FundingSource.joins(:travel_patterns)
@@ -1046,12 +1056,19 @@ class EcolaneAmbassador < BookingAmbassador
                                             .where(agency_id: agency.id)
                                             .distinct
                                             .pluck(:name)
+    Rails.logger.info "Verified funding sources from valid travel patterns: #{verified_funding_sources}"
   
     # Filter funding source combinations to only include those with verified funding sources
-    funding_source_combinations.select do |combination|
-      verified_funding_sources.include?(combination[:funding_source])
+    filtered_funding_sources = funding_source_combinations.select do |combination|
+      result = verified_funding_sources.include?(combination[:funding_source])
+      Rails.logger.info "Checking funding source: #{combination[:funding_source]}, Included: #{result}"
+      result
     end
+  
+    Rails.logger.info "Filtered funding sources: #{filtered_funding_sources}"
+    filtered_funding_sources
   end
+  
   
 
   ### Build a Funding Hash for the Trip using 1-Click's Rules
