@@ -1011,44 +1011,38 @@ class EcolaneAmbassador < BookingAmbassador
   ### Returns an empty array if no matches found.
   def get_travel_pattern_funding_sources
     agency = @user&.transportation_agency
-    unless @user && @trip && @outbound_trip && @purpose && @service && agency
-      Rails.logger.info "Missing required components: #{@user ? '' : 'user, '}#{@trip ? '' : 'trip, '}#{@outbound_trip ? '' : 'outbound_trip, '}#{@purpose ? '' : 'purpose, '}#{@service ? '' : 'service, '}#{agency ? '' : 'agency'}"
+    service = @service
+  
+    # Log initial presence check for required components
+    unless @user && agency && service
+      Rails.logger.info "Missing required components: #{@user ? '' : 'user, '}#{agency ? '' : 'agency, '}#{service ? '' : 'service, '}"
       return []
     end
+    Rails.logger.info "User: #{@user.id}, Agency: #{agency.id}, Service: #{service.id}"
   
-    # Define the origin and destination for the query
-    origin = { lat: @outbound_trip.origin&.lat, lng: @outbound_trip.origin&.lng }
-    destination = { lat: @outbound_trip.destination&.lat, lng: @outbound_trip.destination&.lng }
+    # Define origin and destination coordinates
+    origin = { lat: @outbound_trip&.origin&.lat, lng: @outbound_trip&.origin&.lng }
+    destination = { lat: @outbound_trip&.destination&.lat, lng: @outbound_trip&.destination&.lng }
+  
+    # Log origin and destination coordinates check
+    unless origin[:lat] && origin[:lng] && destination[:lat] && destination[:lng]
+      Rails.logger.info "Missing coordinates for origin or destination. Origin: #{origin}, Destination: #{destination}"
+      return []
+    end
     Rails.logger.info "Origin: #{origin}, Destination: #{destination}"
   
-    # Gather funding source names from valid funding source combinations
-    funding_source_combinations = valid_funding_source_combinations
-    Rails.logger.info "Funding source combinations: #{funding_source_combinations}"
-    
-    funding_source_names = funding_source_combinations.map { |combo| combo[:funding_source] }
-    Rails.logger.info "Funding source names: #{funding_source_names}"
-  
-    trip_date = @outbound_trip.trip_time.to_date
-    start_time = @outbound_trip.trip_time - @outbound_trip.trip_time.midnight
-    end_time = @inbound_trip ? @inbound_trip.trip_time - @inbound_trip.trip_time.midnight : nil
-    Rails.logger.info "Trip Date: #{trip_date}, Start Time: #{start_time}, End Time: #{end_time}"
-  
-    # Prepare query params for finding matching travel patterns
+    # Prepare query params for finding travel patterns
     query_params = {
       agency: agency,
-      service: @service,
-      purpose: Purpose.find_or_initialize_by(name: @purpose, agency: agency),
+      service: service,
       origin: origin,
-      destination: destination,
-      date: trip_date,
-      start_time: start_time,
-      end_time: end_time
+      destination: destination
     }
     Rails.logger.info "Query params for travel patterns: #{query_params}"
   
-    # Retrieve valid travel patterns based on the parameters
+    # Retrieve valid travel patterns based on origin and destination
     valid_travel_patterns = TravelPattern.available_for(query_params)
-    Rails.logger.info "Valid travel patterns: #{valid_travel_patterns.map(&:id)}"
+    Rails.logger.info "Valid travel patterns found: #{valid_travel_patterns.map(&:id)}"
   
     # Gather the funding sources associated with these travel patterns
     verified_funding_sources = FundingSource.joins(:travel_patterns)
@@ -1056,18 +1050,17 @@ class EcolaneAmbassador < BookingAmbassador
                                             .where(agency_id: agency.id)
                                             .distinct
                                             .pluck(:name)
-    Rails.logger.info "Verified funding sources from valid travel patterns: #{verified_funding_sources}"
+    Rails.logger.info "Verified funding sources based on valid travel patterns: #{verified_funding_sources}"
   
-    # Filter funding source combinations to only include those with verified funding sources
-    filtered_funding_sources = funding_source_combinations.select do |combination|
-      result = verified_funding_sources.include?(combination[:funding_source])
-      Rails.logger.info "Checking funding source: #{combination[:funding_source]}, Included: #{result}"
-      result
+    # Log the result of filtering funding sources
+    if verified_funding_sources.empty?
+      Rails.logger.info "No verified funding sources found for the provided travel patterns."
+    else
+      Rails.logger.info "Returning verified funding sources: #{verified_funding_sources}"
     end
   
-    Rails.logger.info "Filtered funding sources: #{filtered_funding_sources}"
-    filtered_funding_sources
-  end
+    verified_funding_sources
+  end  
   
   
 
