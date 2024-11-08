@@ -1012,6 +1012,7 @@ class EcolaneAmbassador < BookingAmbassador
   def get_travel_pattern_funding_sources
     agency = @user&.transportation_agency
     Rails.logger.info "Agency: #{agency}"
+    Rails.logger.ingo "trip: #{@trip}"
     Rails.logger.info "outbound_trip: #{@outbound_trip}"
     Rails.logger.info "service: #{@service}"
     return [] unless @user && @trip && @outbound_trip && @purpose && @service && agency
