@@ -1011,6 +1011,7 @@ class EcolaneAmbassador < BookingAmbassador
   ### Returns an empty array if no matches found.
   def get_travel_pattern_funding_sources
     agency = @user&.transportation_agency
+    trip = @trip
     Rails.logger.info "Agency: #{agency}"
     Rails.logger.ingo "trip: #{trip}"
     Rails.logger.info "outbound_trip: #{outbound_trip}"
