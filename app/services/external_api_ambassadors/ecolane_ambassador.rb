@@ -1012,56 +1012,47 @@ class EcolaneAmbassador < BookingAmbassador
   def get_travel_pattern_funding_sources
     agency = @user&.transportation_agency
     return [] unless @user && @trip && @outbound_trip && @purpose && @service && agency
-
+  
+    # Define the origin and destination for the query
     origin = { lat: @outbound_trip.origin&.lat, lng: @outbound_trip.origin&.lng }
     destination = { lat: @outbound_trip.destination&.lat, lng: @outbound_trip.destination&.lng }
+  
+    # Gather funding source names from valid funding source combinations
     funding_source_combinations = valid_funding_source_combinations
-    funding_source_names = funding_source_combinations.map{|combo| combo[:funding_source]}
+    funding_source_names = funding_source_combinations.map { |combo| combo[:funding_source] }
+  
     trip_date = @outbound_trip.trip_time.to_date
     start_time = @outbound_trip.trip_time - @outbound_trip.trip_time.midnight
-
-    # inbound_trip could be nil for one-way trips
-    if @inbound_trip
-      end_time = @inbound_trip.trip_time - @inbound_trip.trip_time.midnight
-    else
-      end_time = nil
-    end
-    
+    end_time = @inbound_trip ? @inbound_trip.trip_time - @inbound_trip.trip_time.midnight : nil
+  
+    # Prepare query params for finding matching travel patterns
     query_params = {
       agency: agency,
       service: @service,
       purpose: Purpose.find_or_initialize_by(name: @purpose, agency: agency),
       origin: origin,
       destination: destination,
-      # TODO: Commenting out this newer workflow until it can be tested more.
-      # Putting it back to match earlier workflow for OCC-1075.
-      #date: trip_date,
-      #start_time: start_time,
-      #end_time: end_time,
+      date: trip_date,
+      start_time: start_time,
+      end_time: end_time
     }
-
-    # TODO: Commenting out this newer workflow until it can be tested more.
-    # Putting it back to match earlier workflow for OCC-1075.
-    verified_funding_sources = Set.new(
-      FundingSource.joins(:travel_patterns)
-                   .where(
-                     agency_id: agency.id,
-                     travel_patterns: { id: TravelPattern.available_for(query_params).map(&:id) }
-                   ).distinct.pluck(:name)
-    ).to_a
-    #verified_funding_sources = Set.new(
-    #  FundingSource.joins(:travel_patterns)
-    #                .where(
-    #                  agency_id: agency.id,
-    #                  travel_patterns: { id: TravelPattern.available_for(query_params).map(&:id) },
-    #                  name: funding_source_names
-    #                ).distinct.pluck(:name)
-    #)
-    
-    #funding_source_combinations.select { |combination|
-    #  verified_funding_sources.include?(combination[:funding_source])
-    #}
+  
+    # Retrieve valid travel patterns based on the parameters
+    valid_travel_patterns = TravelPattern.available_for(query_params)
+  
+    # Gather the funding sources associated with these travel patterns
+    verified_funding_sources = FundingSource.joins(:travel_patterns)
+                                            .where(travel_patterns: { id: valid_travel_patterns.map(&:id) })
+                                            .where(agency_id: agency.id)
+                                            .distinct
+                                            .pluck(:name)
+  
+    # Filter funding source combinations to only include those with verified funding sources
+    funding_source_combinations.select do |combination|
+      verified_funding_sources.include?(combination[:funding_source])
+    end
   end
+  
 
   ### Build a Funding Hash for the Trip using 1-Click's Rules
   def build_1click_funding_hash
