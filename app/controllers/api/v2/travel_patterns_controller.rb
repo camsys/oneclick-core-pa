@@ -29,53 +29,28 @@ module Api
             end
             trip_purpose_hash = trip_purposes_hash
               .select { |h| h[:code] == purpose }
-              .each { |h| h[:valid_from] ||= Date.today } # Set valid_from to today if nil
+              .delete_if { |h| h[:valid_from].nil? }
               .min_by { |h| h[:valid_from] }
-        
+
             if trip_purpose_hash
               valid_from = trip_purpose_hash[:valid_from]
               valid_until = trip_purpose_hash[:valid_until]
-              Rails.logger.info("Valid From: #{valid_from}, Valid Until: #{valid_until}")
-            else
-              Rails.logger.info("No valid date range found for purpose: #{purpose}")
+
+              puts "Valid From: #{valid_from}, Valid Until: #{valid_until}"
             end
           end
-        
+
+          # Now that we have the purpose, cross-reference funding sources and travel patterns
           valid_patterns = travel_patterns.select do |pattern|
             Rails.logger.info "Checking Travel Pattern ID: #{pattern.id}"
             Rails.logger.info "Funding sources for travel pattern: #{pattern.funding_sources.pluck(:name)}"
             Rails.logger.info "Funding sources from Ecolane: #{funding_source_names}"
-            
+
             if pattern.funding_sources.present? && funding_source_names.present?
-              matching_funding_sources = pattern.funding_sources.select do |fs|
-                funding_source_names.include?(fs.name)
-              end
-        
-              if matching_funding_sources.any?
-                current_date = Date.today
-                
-                valid_funding_sources = matching_funding_sources.select do |fs|
-                  # Get the valid_from and valid_until for the Ecolane funding source
-                  valid_from = (fs.valid_from || current_date).to_date
-                  valid_until = (fs.valid_until || Date::Infinity.new).to_date
-
-                  # Check if today is within the valid date range
-                  (valid_from <= current_date) && (valid_until >= current_date)
-                end
-                
-                if valid_funding_sources.any?
-                  Rails.logger.info "Valid funding source with date range found for Travel Pattern ID: #{pattern.id}"
-                  true
-                else
-                  Rails.logger.info "No valid funding source within date range for Travel Pattern ID: #{pattern.id}"
-                  false
-                end
-              else
-                Rails.logger.info "No valid date range or matching funding sources for Travel Pattern ID: #{pattern.id}"
-                false
-              end
+              match_found = pattern.funding_sources.any? { |fs| funding_source_names.include?(fs.name) }
+              Rails.logger.info "Match found: #{match_found}"
+              match_found
             else
-
               Rails.logger.info "No valid funding sources found for Travel Pattern ID: #{pattern.id}"
               false
             end
@@ -93,6 +68,7 @@ module Api
             render fail_response(status: 404, message: "Not found")
           end
         else
+          # If no purpose, just return all available travel patterns without further filtering
           if travel_patterns.any?
             api_response = travel_patterns.map { |pattern| TravelPattern.to_api_response(pattern, service) }
             render status: :ok, json: {
@@ -103,7 +79,6 @@ module Api
             render fail_response(status: 404, message: "Not found")
           end
         end
-        
       end
       protected
 
