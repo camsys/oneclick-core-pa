@@ -21,8 +21,8 @@ module Api
           if booking_profile
             begin
               trip_purposes, trip_purposes_hash = booking_profile.booking_ambassador.get_trip_purposes
-              puts "Trip Purposes Count: #{trip_purposes.count}"
-              puts "Trip Purposes Hash Count: #{trip_purposes_hash.count}"
+              Rails.logger.info "Trip Purposes Count: #{trip_purposes.count}"
+              Rails.logger.info "Trip Purposes Hash Count: #{trip_purposes_hash.count}"
             rescue Exception => e
               trip_purposes = []
               trip_purposes_hash = []
@@ -36,7 +36,7 @@ module Api
               valid_from = trip_purpose_hash[:valid_from]
               valid_until = trip_purpose_hash[:valid_until]
 
-              puts "Valid From: #{valid_from}, Valid Until: #{valid_until}"
+              Rails.logger.info "Valid From: #{valid_from}, Valid Until: #{valid_until}"
             end
           end
 
@@ -47,6 +47,13 @@ module Api
             Rails.logger.info "Funding sources from Ecolane: #{funding_source_names}"
 
             if pattern.funding_sources.present? && funding_source_names.present?
+              pattern.funding_sources.each do |fs|
+                Rails.logger.info "Pattern Funding Source: #{fs.name}, Valid From: #{fs.valid_from}"
+              end
+              funding_source_names.each do |fs|
+                Rails.logger.info "Ecolane Funding Source: #{fs}"
+              end
+
               match_found = pattern.funding_sources.any? { |fs| funding_source_names.include?(fs.name) } &&
                             funding_source_names.any? { |fs| fs[:valid_from].nil? || fs[:valid_from] <= Date.today }
               Rails.logger.info "Match found: #{match_found}"
