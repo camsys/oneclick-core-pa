@@ -42,12 +42,13 @@ module Api
 
           # Now that we have the purpose, cross-reference funding sources and travel patterns
           valid_patterns = travel_patterns.select do |pattern|
+            Rails.logger.info "Pattern: #{pattern}"
             Rails.logger.info "Checking Travel Pattern ID: #{pattern.id}"
             Rails.logger.info "Funding sources for travel pattern: #{pattern.funding_sources.pluck(:name)}"
             Rails.logger.info "Funding sources from Ecolane: #{funding_source_names}"
 
             if pattern.funding_sources.present? && funding_source_names.present? 
-              match_found = pattern.funding_sources.any? { |fs| funding_source_names.include?(fs.name) } && pattern.valid_for?(valid_from, valid_until)
+              match_found = pattern.funding_sources.any? { |fs| funding_source_names.include?(fs.name) }
               Rails.logger.info "Match found: #{match_found}"
               match_found
             else
