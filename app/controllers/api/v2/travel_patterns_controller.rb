@@ -48,7 +48,7 @@ module Api
 
             if pattern.funding_sources.present? && funding_source_names.present?
               pattern.funding_sources.each do |fs|
-                Rails.logger.info "Pattern Funding Source: #{fs.name}, Valid From: #{fs.valid_from}"
+                Rails.logger.info "Pattern Funding Source: #{fs.name}"
               end
               funding_source_names.each do |fs|
                 Rails.logger.info "Ecolane Funding Source: #{fs}"
