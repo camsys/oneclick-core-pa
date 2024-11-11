@@ -14,6 +14,7 @@ module Api
         query_params[:purpose] = Purpose.find_or_initialize_by(agency: agency, name: purpose.strip) if purpose
         query_params[:funding_sources] = FundingSource.where(name: funding_source_names) if purpose # Only filter funding sources if a purpose is present
         query_params[:date] = Date.strptime(query_params[:date], '%Y-%m-%d') if date
+        Rails.logger.info("Filtering through Travel Patterns with the following filters: #{query_params}")
         travel_patterns = TravelPattern.available_for(query_params)
         if purpose
           Rails.logger.info("Looking for the valid date range for purpose: #{purpose}")
@@ -21,8 +22,8 @@ module Api
           if booking_profile
             begin
               trip_purposes, trip_purposes_hash = booking_profile.booking_ambassador.get_trip_purposes
-              Rails.logger.info "Trip Purposes Count: #{trip_purposes.count}"
-              Rails.logger.info "Trip Purposes Hash Count: #{trip_purposes_hash.count}"
+              puts "Trip Purposes Count: #{trip_purposes.count}"
+              puts "Trip Purposes Hash Count: #{trip_purposes_hash.count}"
             rescue Exception => e
               trip_purposes = []
               trip_purposes_hash = []
@@ -36,32 +37,19 @@ module Api
               valid_from = trip_purpose_hash[:valid_from]
               valid_until = trip_purpose_hash[:valid_until]
 
-              Rails.logger.info "Valid From: #{valid_from}, Valid Until: #{valid_until}"
+              puts "Valid From: #{valid_from}, Valid Until: #{valid_until}"
             end
           end
-
-          # Filter funding sources to only include those valid today
-          valid_funding_sources = funding_source_names.select do |fs|
-            fs[:valid_from].nil? || Date.parse(fs[:valid_from]) <= Date.today
-          end
-
-          Rails.logger.info "Valid funding sources for today: #{valid_funding_sources}"
 
           # Now that we have the purpose, cross-reference funding sources and travel patterns
           valid_patterns = travel_patterns.select do |pattern|
             Rails.logger.info "Checking Travel Pattern ID: #{pattern.id}"
             Rails.logger.info "Funding sources for travel pattern: #{pattern.funding_sources.pluck(:name)}"
-            Rails.logger.info "Funding sources from Ecolane: #{valid_funding_sources}"
-
-            if pattern.funding_sources.present? && valid_funding_sources.present?
-              pattern.funding_sources.each do |fs|
-                Rails.logger.info "Pattern Funding Source: #{fs.name}"
-              end
-              valid_funding_sources.each do |fs|
-                Rails.logger.info "Ecolane Funding Source: #{fs}"
-              end
-
-              match_found = pattern.funding_sources.any? { |fs| valid_funding_sources.include?(fs.name) }
+            Rails.logger.info "Funding sources from Ecolane: #{funding_source_names}"
+          
+            # Check if funding sources from Ecolane are valid for today and listed in the travel pattern
+            if pattern.funding_sources.present? && funding_source_names.present? 
+              match_found = pattern.funding_sources.any? { |fs| funding_source_names.include?(fs.name) }
               Rails.logger.info "Match found: #{match_found}"
               match_found
             else
@@ -69,6 +57,7 @@ module Api
               false
             end
           end
+          
 
           if valid_patterns.any?
             Rails.logger.info("Found the following matching Travel Patterns: #{valid_patterns.map { |t| t['id'] }}")
@@ -94,7 +83,6 @@ module Api
           end
         end
       end
-
       protected
 
       def query_params
@@ -107,6 +95,7 @@ module Api
           destination: [:lat, :lng]
         )
       end
+
     end
   end
 end
