@@ -54,6 +54,9 @@ module Api
         
               if matching_funding_sources.any? && valid_from && valid_until
                 current_date = Date.today
+                valid_from = valid_from.to_date if valid_from
+                valid_until = valid_until.to_date if valid_until
+                
                 valid_date_range = (valid_from <= current_date) && (valid_until >= current_date)
                 Rails.logger.info "Valid date range: #{valid_date_range} (from #{valid_from} to #{valid_until})"
                 
@@ -69,7 +72,7 @@ module Api
               false
             end
           end
-              
+
           if valid_patterns.any?
             Rails.logger.info("Found the following matching Travel Patterns: #{valid_patterns.map { |t| t['id'] }}")
             api_response = valid_patterns.map { |pattern| TravelPattern.to_api_response(pattern, service, valid_from, valid_until) }
