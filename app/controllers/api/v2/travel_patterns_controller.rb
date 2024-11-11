@@ -35,29 +35,30 @@ module Api
             if trip_purpose_hash
               valid_from = trip_purpose_hash[:valid_from]
               valid_until = trip_purpose_hash[:valid_until]
-         
+
               valid_from = Date.parse(valid_from) if valid_from.is_a?(String)
               valid_from = Date.today if valid_from.nil? || valid_from > Date.today
-            
+
               puts "Valid From: #{valid_from}, Valid Until: #{valid_until}"
             end
-            
-            # Now that we have the purpose, cross-reference funding sources and travel patterns
-            valid_patterns = travel_patterns.select do |pattern|
-              Rails.logger.info "Checking Travel Pattern ID: #{pattern.id}"
-              Rails.logger.info "Funding sources for travel pattern: #{pattern.funding_sources.pluck(:name)}"
-              Rails.logger.info "Funding sources from Ecolane: #{funding_source_names}"
-            
-              if pattern.funding_sources.present? && funding_source_names.present?
-                match_found = pattern.funding_sources.any? { |fs| funding_source_names.include?(fs.name) } &&
-                              funding_source_names.any? { |fs| fs[:valid_from].nil? || Date.parse(fs[:valid_from]) <= Date.today }
-                Rails.logger.info "Match found: #{match_found}"
-                match_found
-              else
-                Rails.logger.info "No valid funding sources found for Travel Pattern ID: #{pattern.id}"
-                false
-              end
+          end
+
+          # Now that we have the purpose, cross-reference funding sources and travel patterns
+          valid_patterns = travel_patterns.select do |pattern|
+            Rails.logger.info "Checking Travel Pattern ID: #{pattern.id}"
+            Rails.logger.info "Funding sources for travel pattern: #{pattern.funding_sources.pluck(:name)}"
+            Rails.logger.info "Funding sources from Ecolane: #{funding_source_names}"
+
+            if pattern.funding_sources.present? && funding_source_names.present?
+              match_found = pattern.funding_sources.any? { |fs| funding_source_names.include?(fs.name) } &&
+                            funding_source_names.any? { |fs| fs[:valid_from].nil? || (fs[:valid_from].is_a?(String) ? Date.parse(fs[:valid_from]) : fs[:valid_from]) <= Date.today }
+              Rails.logger.info "Match found: #{match_found}"
+              match_found
+            else
+              Rails.logger.info "No valid funding sources found for Travel Pattern ID: #{pattern.id}"
+              false
             end
+          end
 
           if valid_patterns.any?
             Rails.logger.info("Found the following matching Travel Patterns: #{valid_patterns.map { |t| t['id'] }}")
