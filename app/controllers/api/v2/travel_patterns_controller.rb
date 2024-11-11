@@ -40,22 +40,28 @@ module Api
             end
           end
 
+          # Filter funding sources to only include those valid today
+          valid_funding_sources = funding_source_names.select do |fs|
+            fs[:valid_from].nil? || Date.parse(fs[:valid_from]) <= Date.today
+          end
+
+          Rails.logger.info "Valid funding sources for today: #{valid_funding_sources}"
+
           # Now that we have the purpose, cross-reference funding sources and travel patterns
           valid_patterns = travel_patterns.select do |pattern|
             Rails.logger.info "Checking Travel Pattern ID: #{pattern.id}"
             Rails.logger.info "Funding sources for travel pattern: #{pattern.funding_sources.pluck(:name)}"
-            Rails.logger.info "Funding sources from Ecolane: #{funding_source_names}"
+            Rails.logger.info "Funding sources from Ecolane: #{valid_funding_sources}"
 
-            if pattern.funding_sources.present? && funding_source_names.present?
+            if pattern.funding_sources.present? && valid_funding_sources.present?
               pattern.funding_sources.each do |fs|
                 Rails.logger.info "Pattern Funding Source: #{fs.name}"
               end
-              funding_source_names.each do |fs|
+              valid_funding_sources.each do |fs|
                 Rails.logger.info "Ecolane Funding Source: #{fs}"
               end
 
-              match_found = pattern.funding_sources.any? { |fs| funding_source_names.include?(fs.name) } &&
-                            funding_source_names.any? { |fs| fs[:valid_from].nil? || fs[:valid_from] <= Date.today }
+              match_found = pattern.funding_sources.any? { |fs| valid_funding_sources.include?(fs.name) }
               Rails.logger.info "Match found: #{match_found}"
               match_found
             else
