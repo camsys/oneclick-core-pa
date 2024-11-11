@@ -30,9 +30,9 @@ module Api
             end
             trip_purpose_hash = trip_purposes_hash
               .select { |h| h[:code] == purpose }
-              .delete_if { |h| h[:valid_from].nil? }
+              .each { |h| h[:valid_from] ||= Date.today } # Set valid_from to today if nil
               .min_by { |h| h[:valid_from] }
-
+        
             if trip_purpose_hash
               valid_from = trip_purpose_hash[:valid_from]
               valid_until = trip_purpose_hash[:valid_until]
@@ -42,25 +42,21 @@ module Api
             end
           end
         
-          # Cross-reference funding sources for each travel pattern, ensuring both conditions are met
           valid_patterns = travel_patterns.select do |pattern|
             Rails.logger.info "Checking Travel Pattern ID: #{pattern.id}"
             Rails.logger.info "Funding sources for travel pattern: #{pattern.funding_sources.pluck(:name)}"
             Rails.logger.info "Funding sources from Ecolane: #{funding_source_names}"
             
-            # Step 1: Check that funding sources match between Ecolane and the travel pattern
             if pattern.funding_sources.present? && funding_source_names.present?
               matching_funding_sources = pattern.funding_sources.select do |fs|
                 funding_source_names.include?(fs.name)
               end
-
-              # Step 2: Validate the date range if matching funding sources are found
+        
               if matching_funding_sources.any? && valid_from && valid_until
                 current_date = Date.today
                 valid_date_range = (valid_from <= current_date) && (valid_until >= current_date)
                 Rails.logger.info "Valid date range: #{valid_date_range} (from #{valid_from} to #{valid_until})"
                 
-                # Allow only if both funding source and date range are valid
                 valid = valid_date_range
                 Rails.logger.info "Match found and date range is valid: #{valid}"
                 valid
@@ -73,7 +69,7 @@ module Api
               false
             end
           end
-
+              
           if valid_patterns.any?
             Rails.logger.info("Found the following matching Travel Patterns: #{valid_patterns.map { |t| t['id'] }}")
             api_response = valid_patterns.map { |pattern| TravelPattern.to_api_response(pattern, service, valid_from, valid_until) }
@@ -86,7 +82,6 @@ module Api
             render fail_response(status: 404, message: "Not found")
           end
         else
-          # If no purpose, just return all available travel patterns without further filtering
           if travel_patterns.any?
             api_response = travel_patterns.map { |pattern| TravelPattern.to_api_response(pattern, service) }
             render status: :ok, json: {
@@ -97,6 +92,7 @@ module Api
             render fail_response(status: 404, message: "Not found")
           end
         end
+        
       end
       protected
 
