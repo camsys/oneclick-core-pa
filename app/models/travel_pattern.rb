@@ -384,8 +384,6 @@ class TravelPattern < ApplicationRecord
     ]
     query = self.all
 
-    Rails.logger.info "Initial query: #{query.to_sql}"
-
     # First filter by all provided params except origin and destination
     filters.each do |filter|
       method_name = ("with_" + filter.to_s).to_sym
@@ -452,7 +450,6 @@ class TravelPattern < ApplicationRecord
       while (days_notice < booking_window.maximum_days_notice && date < end_date) do
         date += 1.day
         days_notice += 1 if business_days.include?(date.strftime('%Y-%m-%d'))
-        Rails.logger.info "Inside while loop: date: #{date}, days_notice: #{days_notice}, end_date: #{end_date}"
       end
   
       Rails.logger.info "After while loop for end_date calculation: date: #{date}, days_notice: #{days_notice}, end_date: #{end_date}"
