@@ -45,17 +45,33 @@ module Api
           # Cross-reference funding sources for each travel pattern, ensuring both conditions are met
           valid_patterns = travel_patterns.select do |pattern|
             Rails.logger.info "Checking Travel Pattern ID: #{pattern.id}"
-            pattern_funding_sources = pattern.funding_sources.pluck(:name)
-            Rails.logger.info "Funding sources for travel pattern: #{pattern_funding_sources}"
+            Rails.logger.info "Funding sources for travel pattern: #{pattern.funding_sources.pluck(:name)}"
             Rails.logger.info "Funding sources from Ecolane: #{funding_source_names}"
-        
-            # Ensure matching funding source is in both the travel pattern and Ecolane response
-            match_found = pattern_funding_sources.any? do |fs|
-              funding_source_names.include?(fs)
+            
+            # Step 1: Check that funding sources match between Ecolane and the travel pattern
+            if pattern.funding_sources.present? && funding_source_names.present?
+              matching_funding_sources = pattern.funding_sources.select do |fs|
+                funding_source_names.include?(fs.name)
+              end
+
+              # Step 2: Validate the date range if matching funding sources are found
+              if matching_funding_sources.any? && valid_from && valid_until
+                current_date = Date.today
+                valid_date_range = (valid_from <= current_date) && (valid_until >= current_date)
+                Rails.logger.info "Valid date range: #{valid_date_range} (from #{valid_from} to #{valid_until})"
+                
+                # Allow only if both funding source and date range are valid
+                valid = valid_date_range
+                Rails.logger.info "Match found and date range is valid: #{valid}"
+                valid
+              else
+                Rails.logger.info "No valid date range or matching funding sources for Travel Pattern ID: #{pattern.id}"
+                false
+              end
+            else
+              Rails.logger.info "No valid funding sources found for Travel Pattern ID: #{pattern.id}"
+              false
             end
-        
-            Rails.logger.info "Match found: #{match_found}" if match_found
-            match_found
           end
 
           if valid_patterns.any?
