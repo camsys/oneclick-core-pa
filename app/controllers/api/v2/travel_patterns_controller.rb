@@ -36,25 +36,26 @@ module Api
             if trip_purpose_hash
               valid_from = trip_purpose_hash[:valid_from]
               valid_until = trip_purpose_hash[:valid_until]
-
-              puts "Valid From: #{valid_from}, Valid Until: #{valid_until}"
+              Rails.logger.info("Valid From: #{valid_from}, Valid Until: #{valid_until}")
+            else
+              Rails.logger.info("No valid date range found for purpose: #{purpose}")
             end
           end
-
-          # Now that we have the purpose, cross-reference funding sources and travel patterns
+        
+          # Cross-reference funding sources for each travel pattern, ensuring both conditions are met
           valid_patterns = travel_patterns.select do |pattern|
             Rails.logger.info "Checking Travel Pattern ID: #{pattern.id}"
-            Rails.logger.info "Funding sources for travel pattern: #{pattern.funding_sources.pluck(:name)}"
+            pattern_funding_sources = pattern.funding_sources.pluck(:name)
+            Rails.logger.info "Funding sources for travel pattern: #{pattern_funding_sources}"
             Rails.logger.info "Funding sources from Ecolane: #{funding_source_names}"
-
-            if pattern.funding_sources.present? && funding_source_names.present?
-              match_found = pattern.funding_sources.any? { |fs| funding_source_names.include?(fs.name) }
-              Rails.logger.info "Match found: #{match_found}"
-              match_found
-            else
-              Rails.logger.info "No valid funding sources found for Travel Pattern ID: #{pattern.id}"
-              false
+        
+            # Ensure matching funding source is in both the travel pattern and Ecolane response
+            match_found = pattern_funding_sources.any? do |fs|
+              funding_source_names.include?(fs)
             end
+        
+            Rails.logger.info "Match found: #{match_found}" if match_found
+            match_found
           end
 
           if valid_patterns.any?
