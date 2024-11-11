@@ -39,8 +39,6 @@ class TravelPattern < ApplicationRecord
       queried_origin, queried_destination, queried_origin, queried_destination, true
     )
   
-    # Ensure proper grouping of conditions in the SQL query
-    Rails.logger.info "Generated SQL: #{patterns.to_sql}"
   
     Rails.logger.info "Initial Patterns found: #{patterns.pluck(:id)}"
   
@@ -415,8 +413,6 @@ class TravelPattern < ApplicationRecord
         query = query.with_destination(query_params[:destination])
       end
     end
-
-    Rails.logger.info "Query before filtering by time: #{query.to_sql}"
 
     # Filter by time if start_time and end_time are provided
     travel_patterns = self.filter_by_time(query.distinct, query_params[:start_time], query_params[:end_time])

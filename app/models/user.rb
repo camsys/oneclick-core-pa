@@ -233,14 +233,12 @@ class User < ApplicationRecord
               .fetch('funding_source', {})
     ].flatten
 
-    Rails.logger.info "Funding Options: #{funding_options}"
     
     funding_options.each do |funding_source|
       Rails.logger.info "Funding Source: #{funding_source}"
       allowed_purposes = [funding_source['allowed']].flatten
       allowed_purposes.each do |allowed_purpose|
         # Skip any allowed_purpose that is missing or blank
-        Rails.logger.info "Allowed Purpose: #{allowed_purpose}"
         next if allowed_purpose.nil? || allowed_purpose['purpose'].nil? || allowed_purpose['purpose'].strip.empty?
         purpose = allowed_purpose['purpose'].strip
         funding_hash[purpose] ||= []
