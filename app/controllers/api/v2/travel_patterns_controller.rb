@@ -31,47 +31,59 @@ module Api
               .select { |h| h[:code] == purpose }
               .delete_if { |h| h[:valid_from].nil? }
               .min_by { |h| h[:valid_from] }
-        
+
             if trip_purpose_hash
               valid_from = trip_purpose_hash[:valid_from]
               valid_until = trip_purpose_hash[:valid_until]
-        
+
               valid_from = Date.today if valid_from.nil? || valid_from > Date.today
-        
-              # Now, ensure that the funding source matches the travel pattern's funding sources
-              valid_patterns = travel_patterns.select do |pattern|
-                Rails.logger.info "Checking Travel Pattern ID: #{pattern.id}"
-                Rails.logger.info "Funding sources for travel pattern: #{pattern.funding_sources.pluck(:name)}"
-                Rails.logger.info "Funding sources from Ecolane: #{funding_source_names}"
-        
-                # Check if funding sources from Ecolane are present in the travel pattern
-                if pattern.funding_sources.present? && funding_source_names.present?
-                  funding_source_match = pattern.funding_sources.any? do |fs|
-                    funding_source_names.include?(fs.name) && (fs.valid_from.nil? || fs.valid_from <= Date.today)
-                  end
-                  Rails.logger.info "Match found: #{funding_source_match}"
-                  funding_source_match
-                else
-                  Rails.logger.info "No valid funding sources found for Travel Pattern ID: #{pattern.id}"
-                  false
-                end
-              end
-        
-              if valid_patterns.any?
-                Rails.logger.info("Found the following matching Travel Patterns: #{valid_patterns.map { |t| t['id'] }}")
-                api_response = valid_patterns.map { |pattern| TravelPattern.to_api_response(pattern, service, valid_from, valid_until) }
-                render status: :ok, json: {
-                  status: "success",
-                  data: api_response
-                }
-              else
-                Rails.logger.info("No matching Travel Patterns found")
-                render fail_response(status: 404, message: "Not found")
-              end
+
+              puts "Valid From: #{valid_from}, Valid Until: #{valid_until}"
             end
           end
-        end        
+
+          # Now that we have the purpose, cross-reference funding sources and travel patterns
+          valid_patterns = travel_patterns.select do |pattern|
+            Rails.logger.info "Checking Travel Pattern ID: #{pattern.id}"
+            Rails.logger.info "Funding sources for travel pattern: #{pattern.funding_sources.pluck(:name)}"
+            Rails.logger.info "Funding sources from Ecolane: #{funding_source_names}"
+
+            if pattern.funding_sources.present? && funding_source_names.present?
+              match_found = pattern.funding_sources.any? { |fs| funding_source_names.include?(fs.name) } &&
+                            funding_source_names.any? { |fs| fs[:valid_from].nil? || fs[:valid_from] <= Date.today }
+              Rails.logger.info "Match found: #{match_found}"
+              match_found
+            else
+              Rails.logger.info "No valid funding sources found for Travel Pattern ID: #{pattern.id}"
+              false
+            end
+          end
+
+          if valid_patterns.any?
+            Rails.logger.info("Found the following matching Travel Patterns: #{valid_patterns.map { |t| t['id'] }}")
+            api_response = valid_patterns.map { |pattern| TravelPattern.to_api_response(pattern, service, valid_from, valid_until) }
+            render status: :ok, json: {
+              status: "success",
+              data: api_response
+            }
+          else
+            Rails.logger.info("No matching Travel Patterns found")
+            render fail_response(status: 404, message: "Not found")
+          end
+        else
+          # If no purpose, just return all available travel patterns without further filtering
+          if travel_patterns.any?
+            api_response = travel_patterns.map { |pattern| TravelPattern.to_api_response(pattern, service) }
+            render status: :ok, json: {
+              status: "success",
+              data: api_response
+            }
+          else
+            render fail_response(status: 404, message: "Not found")
+          end
+        end
       end
+
       protected
 
       def query_params
@@ -84,7 +96,6 @@ module Api
           destination: [:lat, :lng]
         )
       end
-
     end
   end
 end
