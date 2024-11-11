@@ -232,13 +232,20 @@ class User < ApplicationRecord
       customer.fetch('funding', {})
               .fetch('funding_source', {})
     ].flatten
-
-
+  
+    max_booking_notice_days = Config.find_by(key: 'maximum_booking_notice')&.value.to_i || 59
+    current_date = Date.today
+    booking_window_end_date = current_date + max_booking_notice_days
+  
     funding_options.each do |funding_source|
       Rails.logger.info "Funding Source: #{funding_source}"
       allowed_purposes = [funding_source['allowed']].flatten
       valid_from = Date.parse(funding_source['valid_from']) rescue nil
-      next if valid_from && valid_from > Date.today
+      valid_until = Date.parse(funding_source['valid_until']) rescue nil
+  
+      # Exclude funding sources that are valid in the future or past the booking window
+      next if valid_from && valid_from > booking_window_end_date
+      next if valid_until && valid_until < current_date
   
       allowed_purposes.each do |allowed_purpose|
         # Skip any allowed_purpose that is missing or blank
@@ -254,6 +261,7 @@ class User < ApplicationRecord
     funding_hash
   end
   
+
 
   # Set Require Confirmation to be true
   def confirmation_required?
