@@ -76,6 +76,11 @@ module Api
               end
             else
 
+              Rails.logger.info "No valid funding sources found for Travel Pattern ID: #{pattern.id}"
+              false
+            end
+          end
+
           if valid_patterns.any?
             Rails.logger.info("Found the following matching Travel Patterns: #{valid_patterns.map { |t| t['id'] }}")
             api_response = valid_patterns.map { |pattern| TravelPattern.to_api_response(pattern, service, valid_from, valid_until) }
