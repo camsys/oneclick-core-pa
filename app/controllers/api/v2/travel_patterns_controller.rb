@@ -14,7 +14,6 @@ module Api
         query_params[:purpose] = Purpose.find_or_initialize_by(agency: agency, name: purpose.strip) if purpose
         query_params[:funding_sources] = FundingSource.where(name: funding_source_names) if purpose # Only filter funding sources if a purpose is present
         query_params[:date] = Date.strptime(query_params[:date], '%Y-%m-%d') if date
-        Rails.logger.info("Filtering through Travel Patterns with the following filters: #{query_params}")
         travel_patterns = TravelPattern.available_for(query_params)
         if purpose
           Rails.logger.info("Looking for the valid date range for purpose: #{purpose}")

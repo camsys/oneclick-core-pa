@@ -96,7 +96,6 @@ class TravelPattern < ApplicationRecord
         end
       end
   
-      Rails.logger.info "Final valid patterns: #{valid_patterns.map(&:id)}"
       if valid_patterns.empty?
         Rails.logger.info "No valid travel patterns found for origin and destination"
         raise ActiveRecord::RecordNotFound, "No valid travel patterns found for origin and destination"
@@ -393,9 +392,7 @@ class TravelPattern < ApplicationRecord
       param = query_params[filter]
 
       if param
-        Rails.logger.info "Applying filter: #{filter} with param: #{param}"
         query = query.send(method_name, param)
-        Rails.logger.info "Query after applying #{filter}: #{query.to_sql}"
       end
     end
 
