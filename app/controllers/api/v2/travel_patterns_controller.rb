@@ -53,14 +53,14 @@ module Api
         
               if matching_funding_sources.any?
                 current_date = Date.today
+                
                 valid_funding_sources = matching_funding_sources.select do |fs|
-                  ecolane_fs = ecolane_funding_sources.find { |efs| efs[:name] == fs.name }
-                  next false unless ecolane_fs
-                  
-                  fs_valid_from = ecolane_fs[:valid_from] || current_date
-                  fs_valid_until = ecolane_fs[:valid_until] || Date::Infinity.new
-                  
-                  (fs_valid_from.to_date <= current_date) && (fs_valid_until.to_date >= current_date)
+                  # Get the valid_from and valid_until for the Ecolane funding source
+                  valid_from = (fs.valid_from || current_date).to_date
+                  valid_until = (fs.valid_until || Date::Infinity.new).to_date
+
+                  # Check if today is within the valid date range
+                  (valid_from <= current_date) && (valid_until >= current_date)
                 end
                 
                 if valid_funding_sources.any?
@@ -75,10 +75,6 @@ module Api
                 false
               end
             else
-              Rails.logger.info "No valid funding sources found for Travel Pattern ID: #{pattern.id}"
-              false
-            end
-          end
 
           if valid_patterns.any?
             Rails.logger.info("Found the following matching Travel Patterns: #{valid_patterns.map { |t| t['id'] }}")
