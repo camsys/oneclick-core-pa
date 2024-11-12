@@ -233,11 +233,20 @@ class User < ApplicationRecord
               .fetch('funding_source', {})
     ].flatten
 
-    Rails.logger.info "Funding Options: #{funding_options}"
-    
+    max_booking_notice_days = Config.find_by(key: 'maximum_booking_notice')&.value.to_i || 59
+    current_date = Date.today
+    booking_window_end_date = current_date + max_booking_notice_days
+
     funding_options.each do |funding_source|
       Rails.logger.info "Funding Source: #{funding_source}"
       allowed_purposes = [funding_source['allowed']].flatten
+      valid_from = Date.parse(funding_source['valid_from']) rescue nil
+      valid_until = Date.parse(funding_source['valid_until']) rescue nil
+
+      # Exclude funding sources that are valid in the future or past the booking window
+      next if valid_from && valid_from > booking_window_end_date
+      next if valid_until && valid_until < current_date
+
       allowed_purposes.each do |allowed_purpose|
         # Skip any allowed_purpose that is missing or blank
         Rails.logger.info "Allowed Purpose: #{allowed_purpose}"
