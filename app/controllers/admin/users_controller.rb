@@ -50,7 +50,7 @@ class Admin::UsersController < Admin::AdminController
   end
 
   def travelers
-    @travelers = current_user.get_travelers_for_staff_user
+    @travelers = current_user.get_travelers_for_staff_user || []
   end
 
   def staff
