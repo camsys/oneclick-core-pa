@@ -165,6 +165,8 @@ module OTP
     
       # Parse and return the JSON response
       JSON.parse(response.body)
+
+      return resp
     end
    
     # Helper method to make the GraphQL request
