@@ -181,23 +181,20 @@ class OTPAmbassador
     # Check for invalid legs directly within the legs array
     itin_has_invalid_leg = otp_itin["legs"].detect { |leg| leg['serviceName'] && leg['serviceId'].nil? }
     return nil if itin_has_invalid_leg
-    
+
     # Get the first valid service ID in the legs array
     service_id = otp_itin["legs"]
                     .detect { |leg| leg['serviceId'].present? }
                     &.fetch('serviceId', nil)
-    
-    # Get the start_time and end_time
-    start_time = Time.at(otp_itin["startTime"].to_i / 1000).in_time_zone
-    end_time = Time.at(otp_itin["endTime"].to_i / 1000).in_time_zone
-    
-    # Log the computed start_time and end_time
-    Rails.logger.info "Computed start_time: #{start_time}, end_time: #{end_time}"
-    
-    # Construct the itinerary hash, accessing legs directly from the hash
+
+    # Construct the itinerary hash, but include the start and end times in each leg
+    otp_itin["legs"].each do |leg|
+      leg["startTime"] = Time.at(otp_itin["startTime"].to_i / 1000).in_time_zone
+      leg["endTime"] = Time.at(otp_itin["endTime"].to_i / 1000).in_time_zone
+    end
+
+    # Construct the final itinerary hash
     {
-      start_time: start_time,
-      end_time: end_time,
       transit_time: get_transit_time(otp_itin, trip_type),
       walk_time: get_walk_time(otp_itin, trip_type),
       wait_time: get_wait_time(otp_itin),
@@ -207,6 +204,7 @@ class OTPAmbassador
       trip_type: trip_type,
       service_id: service_id
     }
+
   end    
   
 
