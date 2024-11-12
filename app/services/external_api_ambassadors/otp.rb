@@ -179,21 +179,6 @@ module OTP
       http.request(request)
     end
     
-    def parse_itinerary(itinerary)
-      Rails.logger.info("Parsing itinerary: #{itinerary}")
-      {
-        startTime: Time.at(itinerary["startTime"] / 1000),
-        endTime: Time.at(itinerary["endTime"] / 1000),
-        legs: itinerary["legs"].map do |leg|
-          {
-            mode: leg["mode"],
-            from: { name: leg["from"]["name"], lat: leg["from"]["lat"], lon: leg["from"]["lon"] },
-            to: { name: leg["to"]["name"], lat: leg["to"]["lat"], lon: leg["to"]["lon"] },
-            points: leg["legGeometry"]["points"]
-          }
-        end
-      }
-    end
 
     def build_url(from, to, trip_datetime, arrive_by, options={})
       # Set Default Options
