@@ -158,13 +158,13 @@ module OTP
       Rails.logger.info("Request body: #{body}")
     
       # Make the GraphQL request
-      response = make_graphql_request(url, body, headers)
+      resp = make_graphql_request(url, body, headers)
     
       # Log the response
-      Rails.logger.info("GraphQL response: #{response.body}")
+      Rails.logger.info("GraphQL response: #{resp.body}")
     
       # Parse and return the JSON response
-      JSON.parse(response.body)
+      JSON.parse(resp.body)
 
       return resp
     end
