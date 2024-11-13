@@ -160,39 +160,39 @@ class TripPlanner
     max_walk_minutes = Config.max_walk_minutes
     max_walk_distance = Config.max_walk_distance
     itineraries = @trip.itineraries.map do |itin|
-
+  
       Rails.logger.info "Checking itinerary: #{itin.inspect}"
-
-
-      ## Test: Make sure we never exceed the maximium walk time
-      if itin.walk_time and itin.walk_time > max_walk_minutes*60
+  
+      # Test: Make sure we never exceed the maximum walk time
+      if itin.walk_time and itin.walk_time > max_walk_minutes * 60
         next
       end
-
-      ## Test: Make sure that we only ever return 1 walk trip
-      if itin.walk_time and itin.duration and itin.walk_time == itin.duration 
+  
+      # New Check: If the itinerary has only one leg, and the walk_time is non-zero,
+      # transit_time and wait_time are zero, treat it as a walk-only trip
+      if itin.legs.count == 1 && itin.walk_time > 0 && itin.transit_time == 0 && itin.wait_time == 0
         if walk_seen
           Rails.logger.info "Skipping duplicate walk trip: #{itin.inspect}"
-          next 
-        else 
-          walk_seen = true 
+          next
+        else
+          walk_seen = true
         end
       end
-
+  
       # Test: Filter out walk-only itineraries when walking is deselected
       if !@trip.itineraries.map(&:trip_type).include?('walk') && itin.trip_type == 'transit' && 
         itin.legs.all? { |leg| leg['mode'] == 'WALK' } && 
         itin.walk_distance >= itin.legs.first['distance']
         Rails.logger.info "Skipping walk-only trip due to deselection of walk: #{itin.inspect}"
-      next
+        next
       end
-
+  
       # Test: Filter out itineraries where user has de-selected walking as a trip type, kept transit, and any walking leg in the transit trip exceeds the maximum walk distance
       if !@trip.itineraries.map(&:trip_type).include?('walk') && itin.trip_type == 'transit' && itin.legs.detect { |leg| leg['mode'] == 'WALK' && leg["distance"] > max_walk_distance }
         Rails.logger.info "Skipping transit trip with excessive walk distance: #{itin.inspect}"
         next
       end
-
+  
       # Test: Only apply max_walk_distance if walking is not selected as a trip type
       if !@trip.itineraries.map(&:trip_type).include?('walk')
         if itin.trip_type == 'transit' && itin.legs.any? { |leg| leg['mode'] == 'WALK' && leg["distance"] > max_walk_distance }
@@ -200,14 +200,16 @@ class TripPlanner
           next
         end
       end
-
-      ## We've passed all the tests
-      itin 
+  
+      # We've passed all the tests
+      itin
     end
+  
     itineraries.delete(nil)
-
+  
     @trip.itineraries = itineraries
   end
+  
 
   # Calls the requisite trip_type itineraries method
   def build_itineraries(trip_type)
