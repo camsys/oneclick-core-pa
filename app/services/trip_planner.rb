@@ -159,6 +159,9 @@ class TripPlanner
     walk_seen = false
     max_walk_minutes = Config.max_walk_minutes
     max_walk_distance = Config.max_walk_distance
+
+    Rails.logger.info("sample trip itinerary: #{@trip.itineraries.first.inspect}")
+
     itineraries = @trip.itineraries.map do |itin|
 
       ## Test: Make sure we never exceed the maximium walk time
