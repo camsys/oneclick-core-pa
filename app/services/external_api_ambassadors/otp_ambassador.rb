@@ -171,7 +171,7 @@ class OTPAmbassador
 
   # Converts an OTP itinerary hash into a set of 1-Click itinerary attributes
   def convert_itinerary(otp_itin, trip_type)
-    associate_legs_with_services(otp_itin)
+    associate_legs_with_services(otp_itin, trip_type)
   
     itin_has_invalid_leg = otp_itin["legs"].detect{ |leg| 
       leg['serviceName'] && leg['serviceId'].nil?
