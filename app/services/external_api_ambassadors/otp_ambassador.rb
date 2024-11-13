@@ -209,16 +209,22 @@ class OTPAmbassador
 
 # Updated associate_legs_with_services method to handle the hash format
 def associate_legs_with_services(otp_itin)
-  Rails.logger.info "Associating legs with services for OTP itinerary: #{otp_itin.inspect}"
+  Rails.logger.info "Inspecting OTP itinerary structure: #{otp_itin.inspect}"
+
+  itineraries = otp_itin['itineraries'] || otp_itin.dig('plan', 'itineraries')
   
-  otp_itin['plan']['itineraries'].each do |itinerary|
+  if itineraries.nil?
+    Rails.logger.error("Error: Expected 'itineraries' array missing from otp_itin. Check structure.")
+    return
+  end
+
+  # Proceed if itineraries are found
+  itineraries.each do |itinerary|
     itinerary['legs'] ||= []
-    
-    # Modify each leg in this itinerary
+
     itinerary['legs'] = itinerary['legs'].map do |leg|
       svc = get_associated_service_for(leg)
 
-      # Adjust based on paratransit mode
       if !leg['mode'].include?('FLEX') && leg['boardRule'] == 'mustPhone'
         leg['mode'] = 'FLEX_ACCESS'
       end
@@ -230,13 +236,14 @@ def associate_legs_with_services(otp_itin)
         leg['serviceLogoUrl'] = svc.full_logo_url
         leg['serviceFullLogoUrl'] = svc.full_logo_url(nil)
       else
-        leg['serviceName'] = (leg['agencyName'] || leg['agencyId'])
+        leg['serviceName'] = leg['agencyName'] || leg['agencyId']
       end
-  
+
       leg
     end
   end
 end
+
 
   
   def get_associated_service_for(leg)
