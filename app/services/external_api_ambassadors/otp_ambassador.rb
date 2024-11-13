@@ -72,20 +72,34 @@ class OTPAmbassador
     return itineraries.map{|i| i.legs.pluck("agencyId")}
   end
 
-  # Returns an array of 1-Click-ready itinerary hashes.
   def get_itineraries(trip_type)
-    return [] if errors(trip_type)
+    # Use the trip's origin and destination points to plan the trip
+    response = @otp.plan(
+      [@trip.origin.lat, @trip.origin.lng],
+      [@trip.destination.lat, @trip.destination.lng],
+      @trip.trip_time,
+      @trip.arrive_by,
+      options = {}
+    )
   
-    itineraries_data = plan(trip_type) 
-    Rails.logger.info "Raw itineraries from GraphQL response: #{itineraries_data.inspect}"
+    # Log the full response to compare with previous responses
+    Rails.logger.info "Full GraphQL response: #{response.inspect}"
   
-    # Wrap each itinerary hash in OTP::OTPItinerary
-    itineraries = itineraries_data.map { |itinerary_hash| OTP::OTPItinerary.new(itinerary_hash) }
+    # Return an empty array if there are errors or no plan data
+    unless response["data"] && response["data"]["plan"]
+      Rails.logger.error "No plan data in response: #{response.inspect}"
+      return []
+    end
   
-    Rails.logger.info "Structure of otp_itin after wrapping: #{itineraries.map(&:itinerary).inspect}"
+    # Log the extracted itineraries for comparison
+    itineraries = response["data"]["plan"]["itineraries"]
+    Rails.logger.info "Extracted itineraries from GraphQL response: #{itineraries.inspect}"
   
-    itineraries.map { |i| convert_itinerary(i, trip_type) }.compact
-  end  
+    # Map and convert each itinerary, compact to remove any nil entries
+    itineraries.map do |i|
+      convert_itinerary(i, trip_type)
+    end.compact
+  end
   
 
   # Extracts a trip duration from the OTP response.
@@ -192,14 +206,18 @@ class OTPAmbassador
   
 
 
-  # Modifies OTP Itin's legs, inserting information about 1-Click services
-  def associate_legs_with_services(otp_itin)
-    Rails.logger.info "Associating legs with services for OTP itinerary: #{otp_itin.inspect}"
-    otp_itin.legs ||= []
-    otp_itin.legs = otp_itin.legs.map do |leg|
+# Updated associate_legs_with_services method to handle the hash format
+def associate_legs_with_services(otp_itin)
+  Rails.logger.info "Associating legs with services for OTP itinerary: #{otp_itin.inspect}"
+  
+  otp_itin['plan']['itineraries'].each do |itinerary|
+    itinerary['legs'] ||= []
+    
+    # Modify each leg in this itinerary
+    itinerary['legs'] = itinerary['legs'].map do |leg|
       svc = get_associated_service_for(leg)
 
-      # double check if its paratransit but not set to that mode
+      # Adjust based on paratransit mode
       if !leg['mode'].include?('FLEX') && leg['boardRule'] == 'mustPhone'
         leg['mode'] = 'FLEX_ACCESS'
       end
@@ -207,16 +225,18 @@ class OTPAmbassador
       if svc
         leg['serviceId'] = svc.id
         leg['serviceName'] = svc.name
-        leg['serviceFareInfo'] = svc.url  # Should point to service's fare_info_url, but we don't have that yet
+        leg['serviceFareInfo'] = svc.url
         leg['serviceLogoUrl'] = svc.full_logo_url
-        leg['serviceFullLogoUrl'] = svc.full_logo_url(nil) # actual size
+        leg['serviceFullLogoUrl'] = svc.full_logo_url(nil)
       else
         leg['serviceName'] = (leg['agencyName'] || leg['agencyId'])
       end
   
       leg
     end
-  end  
+  end
+end
+
   
   def get_associated_service_for(leg)
     svc = nil
