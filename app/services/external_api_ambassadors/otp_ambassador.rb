@@ -169,19 +169,17 @@ class OTPAmbassador
     end 
   end
 
-  # Converts an OTP itinerary hash into a set of 1-Click itinerary attributes
   def convert_itinerary(otp_itin, trip_type)
-    associate_legs_with_services(otp_itin, trip_type)
-  
-    itin_has_invalid_leg = otp_itin["legs"].detect{ |leg| 
+    associate_legs_with_services(otp_itin)
+    itin_has_invalid_leg = otp_itin.legs.detect{ |leg| 
       leg['serviceName'] && leg['serviceId'].nil?
     }
     return nil if itin_has_invalid_leg
-  
-    service_id = otp_itin["legs"]
-                  .detect{ |leg| leg['serviceId'].present? }
-                  &.fetch('serviceId', nil)
-  
+
+    service_id = otp_itin.legs
+                          .detect{ |leg| leg['serviceId'].present? }
+                          &.fetch('serviceId', nil)
+
     return {
       start_time: Time.at(otp_itin["startTime"].to_i/1000).in_time_zone,
       end_time: Time.at(otp_itin["endTime"].to_i/1000).in_time_zone,
@@ -190,29 +188,29 @@ class OTPAmbassador
       wait_time: get_wait_time(otp_itin),
       walk_distance: get_walk_distance(otp_itin),
       cost: extract_cost(otp_itin, trip_type),
-      legs: otp_itin["legs"],
-      trip_type: trip_type,
+      legs: otp_itin.legs.to_a,
+      trip_type: trip_type, #TODO: Make this smarter
       service_id: service_id
     }
-  end    
+  end  
   
 
 
   # Modifies OTP Itin's legs, inserting information about 1-Click services
-  def associate_legs_with_services(otp_itin, trip_type)
-    otp_itin["legs"] ||= []  
-    otp_itin["legs"].map! do |leg|
+  def associate_legs_with_services(otp_itin)
+    otp_itin.legs ||= []
+    otp_itin.legs = otp_itin.legs.map do |leg|
       svc = get_associated_service_for(leg)
-  
-      # Adjust the mode if it's paratransit and not set correctly
+
+      # double check if its paratransit but not set to that mode
       if !leg['mode'].include?('FLEX') && leg['boardRule'] == 'mustPhone'
         leg['mode'] = 'FLEX_ACCESS'
       end
-  
+
       if svc
         leg['serviceId'] = svc.id
         leg['serviceName'] = svc.name
-        leg['serviceFareInfo'] = svc.url
+        leg['serviceFareInfo'] = svc.url  # Should point to service's fare_info_url, but we don't have that yet
         leg['serviceLogoUrl'] = svc.full_logo_url
         leg['serviceFullLogoUrl'] = svc.full_logo_url(nil) # actual size
       else
