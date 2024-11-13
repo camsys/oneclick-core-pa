@@ -229,6 +229,8 @@ class OTPAmbassador
 
   # Calculates the total time spent on transit legs with logger statements for debugging
   def get_transit_time(otp_itin, trip_type)
+
+    Rails.logger.info("otp_itin for the transit time calculation method: #{otp_itin}")
     if trip_type.in? [:car, :bicycle]
       Rails.logger.info("Trip type is #{trip_type}, returning walkTime: #{otp_itin['walkTime']}")
       return otp_itin["walkTime"]
