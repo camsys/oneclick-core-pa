@@ -72,16 +72,6 @@ class OTPAmbassador
     return itineraries.map{|i| i.legs.pluck("agencyId")}
   end
 
-  # Returns an array of 1-Click-ready itinerary hashes.
-  def get_itineraries(trip_type)
-    return [] if errors(trip_type)
-  
-    itineraries = ensure_response(trip_type).itineraries
-    Rails.logger.info "Structure of otp_itin after extraction: #{itineraries.map(&:itinerary).inspect}"
-    
-    itineraries.map { |i| convert_itinerary(i, trip_type) }.compact
-  end
-
   def get_itineraries(trip_type)
     # Use the trip's origin and destination points to plan the trip
     response = @otp.plan(
