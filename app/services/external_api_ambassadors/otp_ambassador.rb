@@ -76,11 +76,17 @@ class OTPAmbassador
   def get_itineraries(trip_type)
     return [] if errors(trip_type)
   
-    itineraries = ensure_response(trip_type).itineraries
-    Rails.logger.info "Structure of otp_itin after extraction: #{itineraries.map(&:itinerary).inspect}"
-    
+    itineraries_data = plan(trip_type) 
+    Rails.logger.info "Raw itineraries from GraphQL response: #{itineraries_data.inspect}"
+  
+    # Wrap each itinerary hash in OTP::OTPItinerary
+    itineraries = itineraries_data.map { |itinerary_hash| OTP::OTPItinerary.new(itinerary_hash) }
+  
+    Rails.logger.info "Structure of otp_itin after wrapping: #{itineraries.map(&:itinerary).inspect}"
+  
     itineraries.map { |i| convert_itinerary(i, trip_type) }.compact
-  end
+  end  
+  
 
   # Extracts a trip duration from the OTP response.
   def get_duration(trip_type)
