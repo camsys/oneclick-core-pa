@@ -159,6 +159,8 @@ class TripPlanner
     walk_seen = false
     max_walk_minutes = Config.max_walk_minutes
     max_walk_distance = Config.max_walk_distance
+
+    Rails.logger.info "these are the itineraries for the filter itineraries trip method: #{@trip}"
     itineraries = @trip.itineraries.map do |itin|
   
       Rails.logger.info "Checking itinerary: #{itin.inspect}"
