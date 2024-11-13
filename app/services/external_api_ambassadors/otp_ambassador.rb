@@ -178,21 +178,20 @@ class OTPAmbassador
     # Check for invalid legs directly within the legs array
     itin_has_invalid_leg = otp_itin["legs"].detect { |leg| leg['serviceName'] && leg['serviceId'].nil? }
     return nil if itin_has_invalid_leg
-  
+
     # Get the first valid service ID in the legs array
     service_id = otp_itin["legs"]
                     .detect { |leg| leg['serviceId'].present? }
                     &.fetch('serviceId', nil)
-  
-    # Construct the itinerary hash, include the duration along with start_time and end_time in each leg
+
+    # Construct the itinerary hash, but include the start and end times in each leg
     otp_itin["legs"].each do |leg|
       leg["startTime"] = Time.at(otp_itin["startTime"].to_i / 1000).in_time_zone
       leg["endTime"] = Time.at(otp_itin["endTime"].to_i / 1000).in_time_zone
     end
-  
-    # Return the final itinerary hash with duration included
+
+    # Construct the final itinerary hash
     {
-      duration: otp_itin["duration"],  # Include duration here
       transit_time: get_transit_time(otp_itin, trip_type),
       walk_time: get_walk_time(otp_itin, trip_type),
       wait_time: get_wait_time(otp_itin),
@@ -202,7 +201,8 @@ class OTPAmbassador
       trip_type: trip_type,
       service_id: service_id
     }
-  end   
+
+  end    
   
 
 
