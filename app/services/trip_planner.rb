@@ -156,15 +156,13 @@ class TripPlanner
 
   # Additional sanity checks can be applied here.
   def filter_itineraries
-    walk_seen = false
     max_walk_minutes = Config.max_walk_minutes
     max_walk_distance = Config.max_walk_distance
-  
-    Rails.logger.info("Sample trip itinerary: #{@trip.itineraries.first.inspect}")
+    walk_only_itinerary = nil # To hold the shortest walk-only itinerary
   
     itineraries = @trip.itineraries.map do |itin|
       # Calculate duration based on start_time and end_time
-      duration = (itin.end_time - itin.start_time).to_i / 60  # Duration in minutes
+      duration = ((itin.end_time - itin.start_time) / 60).to_i # Duration in minutes
       Rails.logger.info("Processing itinerary: #{itin.inspect}")
       Rails.logger.info("Walking time: #{itin.walk_time} | Duration: #{duration} minutes")
   
@@ -174,30 +172,30 @@ class TripPlanner
         next
       end
   
-      # Check: Allow only one walk-only itinerary
-      if itin.walk_time && itin.walk_time == duration
-        if walk_seen
-          Rails.logger.info("Excluding duplicate walk-only itinerary: #{itin.inspect}")
-          next
+      # Check: Filter out extra walk-only itineraries, keeping only the shortest one
+      if itin.walk_time && itin.walk_time == duration * 60
+        if walk_only_itinerary.nil? || itin.walk_time < walk_only_itinerary.walk_time
+          walk_only_itinerary = itin
+          Rails.logger.info("Selected shorter walk-only itinerary: #{itin.inspect}")
         else
-          walk_seen = true
-          Rails.logger.info("Marking walk-only itinerary as seen: #{itin.inspect}")
+          Rails.logger.info("Excluding longer duplicate walk-only itinerary: #{itin.inspect}")
+          next
         end
       end
   
       # Check: Exclude walk-only itineraries if walking is deselected
       if !@trip.itineraries.map(&:trip_type).include?('walk') &&
-         itin.trip_type == 'transit' &&
-         itin.legs.all? { |leg| leg['mode'] == 'WALK' } &&
-         itin.walk_distance >= itin.legs.first['distance']
+          itin.trip_type == 'transit' &&
+          itin.legs.all? { |leg| leg['mode'] == 'WALK' } &&
+          itin.walk_distance >= itin.legs.first['distance']
         Rails.logger.info("Excluding walk-only itinerary as walking is deselected: #{itin.inspect}")
         next
       end
   
       # Check: Exclude itineraries with walking legs exceeding max distance if walking is deselected
       if !@trip.itineraries.map(&:trip_type).include?('walk') &&
-         itin.trip_type == 'transit' &&
-         itin.legs.any? { |leg| leg['mode'] == 'WALK' && leg['distance'] > max_walk_distance }
+          itin.trip_type == 'transit' &&
+          itin.legs.any? { |leg| leg['mode'] == 'WALK' && leg['distance'] > max_walk_distance }
         Rails.logger.info("Excluding itinerary with excessive walk distance in a leg: #{itin.inspect}")
         next
       end
@@ -207,10 +205,14 @@ class TripPlanner
       itin
     end
   
-    itineraries.compact!  # Remove any nil values
+    # Retain only the shortest walk-only itinerary, if any
+    itineraries.compact! # Remove nil values
+    itineraries.push(walk_only_itinerary) if walk_only_itinerary && !itineraries.include?(walk_only_itinerary)
+  
     @trip.itineraries = itineraries
     Rails.logger.info("Final filtered itineraries: #{@trip.itineraries.inspect}")
   end
+  
   
   
 
