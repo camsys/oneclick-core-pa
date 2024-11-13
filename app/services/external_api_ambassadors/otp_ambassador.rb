@@ -73,34 +73,34 @@ class OTPAmbassador
   end
 
   def get_itineraries(trip_type)
-    # Use the trip's origin and destination points to plan the trip
+    # Fetch modes based on the trip_type
+    modes = @trip_type_dictionary[trip_type][:modes].split(',')
+  
+    # Plan the trip with specified modes
     response = @otp.plan(
       [@trip.origin.lat, @trip.origin.lng],
       [@trip.destination.lat, @trip.destination.lng],
       @trip.trip_time,
       @trip.arrive_by,
-      options = {}
+      options = { modes: modes }
     )
   
-    # Log the full response to compare with previous responses
+    # Log and handle response
     Rails.logger.info "Full GraphQL response: #{response.inspect}"
-  
-    # Return an empty array if there are errors or no plan data
     unless response["data"] && response["data"]["plan"]
       Rails.logger.error "No plan data in response: #{response.inspect}"
       return []
     end
   
-    # Log the extracted itineraries for comparison
+    # Extract and log itineraries
     itineraries = response["data"]["plan"]["itineraries"]
     Rails.logger.info "Extracted itineraries from GraphQL response: #{itineraries.inspect}"
   
-    # Map and convert each itinerary, compact to remove any nil entries
+    # Map and convert each itinerary
     itineraries.map do |i|
       convert_itinerary(i, trip_type)
     end.compact
   end
-  
 
   # Extracts a trip duration from the OTP response.
   def get_duration(trip_type)

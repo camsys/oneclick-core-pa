@@ -61,7 +61,20 @@ module OTP
             to: { lat: $toLat, lon: $toLon }
             date: $date
             time: $time
-            transportModes: [{ mode: TRANSIT }, { mode: WALK }]
+            transportModes: [
+              { mode: TRANSIT }, 
+              { mode: WALK },
+              { mode: CAR },
+              { mode: BICYCLE },
+              { mode: BUS },
+              { mode: TRAM },
+              { mode: RAIL },
+              { mode: SUBWAY },
+              { mode: FERRY },
+              { mode: FLEX_ACCESS },
+              { mode: FLEX_EGRESS },
+              { mode: FLEX_DIRECT }
+            ]
           ) {
             itineraries {
               startTime
