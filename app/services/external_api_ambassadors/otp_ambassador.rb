@@ -171,13 +171,10 @@ class OTPAmbassador
 
   # Converts an OTP itinerary hash into a set of 1-Click itinerary attributes
   def convert_itinerary(otp_itin, trip_type)
-    Rails.logger.info "oto_itin before anything else: #{otp_itin}"
     # Associate legs with services, directly accessing legs from the hash
     otp_itin["legs"] ||= []
     associate_legs_with_services(otp_itin)
   
-    Rails.logger.info "otp_itin after associating legs with services: #{otp_itin}"
-
     # Check for invalid legs directly within the legs array
     itin_has_invalid_leg = otp_itin["legs"].detect { |leg| leg['serviceName'] && leg['serviceId'].nil? }
     return nil if itin_has_invalid_leg
@@ -242,25 +239,20 @@ class OTPAmbassador
   end
   
   def get_associated_service_for(agency_id, agency_name)
-    Rails.logger.info("Attempting to associate service for agencyId=#{agency_id}, agencyName=#{agency_name}")
     
     # Attempt to find the service by GTFS agency ID first
     svc = Service.find_by(gtfs_agency_id: agency_id) if agency_id
-    Rails.logger.info("Service found by agency ID: #{svc.inspect}") if svc
   
     if svc
       # Ensure the service is within the list of permitted services
       matched_service = @services.detect { |s| s.id == svc.id }
-      Rails.logger.info("Matched permitted service by agency ID: #{matched_service.inspect}")
       return matched_service
     elsif agency_name
       # If no service found by ID, try finding it by agency name
       svc = Service.find_by(name: agency_name)
-      Rails.logger.info("Service found by agency name: #{svc.inspect}") if svc
   
       # Check if the found service by name is in the permitted list
       matched_service = @services.detect { |s| s.id == svc.id } if svc
-      Rails.logger.info("Matched permitted service by agency name: #{matched_service.inspect}")
       return matched_service
     end
   end
