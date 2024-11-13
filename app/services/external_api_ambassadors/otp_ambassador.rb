@@ -74,10 +74,18 @@ class OTPAmbassador
 
   # Returns an array of 1-Click-ready itinerary hashes.
   def get_itineraries(trip_type)
-    return [] if errors(trip_type)
-    itineraries = ensure_response(trip_type).itineraries
-    return itineraries.map {|i| convert_itinerary(i, trip_type)}.compact
+    # Use the trip's origin and destination points to plan the trip
+    response = @otp.plan([@trip.origin.lat, @trip.origin.lng], [@trip.destination.lat, @trip.destination.lng], @trip.trip_time, @trip.arrive_by, options={})
+    
+    # Return empty array if response has errors
+    return [] unless response["data"] && response["data"]["plan"]
+  
+    # Extract itineraries from the response
+    response["data"]["plan"]["itineraries"].map do |i|
+      convert_itinerary(i, trip_type)
+    end.compact
   end
+  
 
   # Extracts a trip duration from the OTP response.
   def get_duration(trip_type)
