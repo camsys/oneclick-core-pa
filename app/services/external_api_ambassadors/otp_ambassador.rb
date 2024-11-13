@@ -208,24 +208,23 @@ class OTPAmbassador
     end
   end  
   
-  def get_associated_service_for(agency_id, agency_name)
-    
-    # Attempt to find the service by GTFS agency ID first
-    svc = Service.find_by(gtfs_agency_id: agency_id) if agency_id
-  
+  def get_associated_service_for(leg)
+    svc = nil
+    leg ||= {}
+    gtfs_agency_id = leg['agencyId']
+    gtfs_agency_name = leg['agencyName']
+
+    # If gtfs_agency_id is not nil, first attempt to find the service by its GTFS agency ID.
+    svc ||= Service.find_by(gtfs_agency_id: gtfs_agency_id) if gtfs_agency_id
+
     if svc
-      # Ensure the service is within the list of permitted services
-      matched_service = @services.detect { |s| s.id == svc.id }
-      return matched_service
-    elsif agency_name
-      # If no service found by ID, try finding it by agency name
-      svc = Service.find_by(name: agency_name)
-  
-      # Check if the found service by name is in the permitted list
-      matched_service = @services.detect { |s| s.id == svc.id } if svc
-      return matched_service
+      # If a service is found by ID, we need to check if it's within the list of permitted services.
+      return @services.detect { |s| s.id == svc.id }
+    else
+      # If we didn't find a service by its ID, and if gtfs_agency_name is not nil, then we try to find a service by its GTFS agency name.
+      return @services.find_by(name: gtfs_agency_name) if gtfs_agency_name
     end
-  end
+  end  
    
 
   # Calculates the total time spent on transit legs with logger statements for debugging
