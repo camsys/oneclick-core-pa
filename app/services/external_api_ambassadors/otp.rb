@@ -353,7 +353,16 @@ module OTP
     # Returns the array of itineraries
     def extract_itineraries
       return [] unless @response && @response[:plan] && @response[:plan][:itineraries]
-      @response[:plan][:itineraries].map {|i| OTPItinerary.new(i)}
+
+      Rails.logger.info "Extracting itineraries from OTP response response: #{@response.inspect}"
+    
+      # Log the structure of each itinerary before converting to OTPItinerary
+      @response[:plan][:itineraries].each do |itinerary|
+        Rails.logger.info "Original OTP itinerary structure: #{itinerary.inspect}"
+      end
+    
+      # Convert each itinerary hash to OTPItinerary object
+      @response[:plan][:itineraries].map { |i| OTPItinerary.new(i) }
     end
 
   end
