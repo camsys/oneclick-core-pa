@@ -165,20 +165,23 @@ class TripPlanner
     itineraries = @trip.itineraries.map do |itin|
       # Calculate duration based on start_time and end_time
       duration = (itin.end_time - itin.start_time).to_i / 60  # Duration in minutes
-
-      Rails.logger.info("Walking: #{itin.walk_time} Duration: #{duration} minutes")
+      Rails.logger.info("Processing itinerary: #{itin.inspect}")
+      Rails.logger.info("Walking time: #{itin.walk_time} | Duration: #{duration} minutes")
 
       # Check: Ensure itinerary does not exceed max walk time
       if itin.walk_time && itin.walk_time > max_walk_minutes * 60
+        Rails.logger.info("Excluding itinerary due to excessive walk time: #{itin.walk_time}")
         next
       end
 
       # Check: Allow only one walk-only itinerary
       if itin.walk_time && itin.walk_time == duration * 60
         if walk_seen
+          Rails.logger.info("Excluding duplicate walk-only itinerary: #{itin.inspect}")
           next
         else
           walk_seen = true
+          Rails.logger.info("Marking walk-only itinerary as seen: #{itin.inspect}")
         end
       end
 
@@ -187,6 +190,7 @@ class TripPlanner
         itin.trip_type == 'transit' &&
         itin.legs.all? { |leg| leg['mode'] == 'WALK' } &&
         itin.walk_distance >= itin.legs.first['distance']
+        Rails.logger.info("Excluding walk-only itinerary as walking is deselected: #{itin.inspect}")
         next
       end
 
@@ -194,15 +198,18 @@ class TripPlanner
       if !@trip.itineraries.map(&:trip_type).include?('walk') &&
         itin.trip_type == 'transit' &&
         itin.legs.any? { |leg| leg['mode'] == 'WALK' && leg['distance'] > max_walk_distance }
+        Rails.logger.info("Excluding itinerary with excessive walk distance in a leg: #{itin.inspect}")
         next
       end
 
       # Passed all filters
+      Rails.logger.info("Including itinerary: #{itin.inspect}")
       itin
     end
 
     itineraries.compact!  # Remove any nil values
     @trip.itineraries = itineraries
+    Rails.logger.info("Final filtered itineraries: #{@trip.itineraries.inspect}")
   end
   
 
