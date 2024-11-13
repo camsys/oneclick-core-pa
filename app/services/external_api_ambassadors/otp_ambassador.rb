@@ -171,53 +171,38 @@ class OTPAmbassador
 
   # Converts an OTP itinerary hash into a set of 1-Click itinerary attributes
   def convert_itinerary(otp_itin, trip_type)
-    # Associate legs with services, directly accessing legs from the hash
-    otp_itin["legs"] ||= []
     associate_legs_with_services(otp_itin)
   
-    # Check for invalid legs directly within the legs array
-    itin_has_invalid_leg = otp_itin["legs"].detect { |leg| leg['serviceName'] && leg['serviceId'].nil? }
+    itin_has_invalid_leg = otp_itin["legs"].detect{ |leg| 
+      leg['serviceName'] && leg['serviceId'].nil?
+    }
     return nil if itin_has_invalid_leg
-
-    # Get the first valid service ID in the legs array
+  
     service_id = otp_itin["legs"]
-                    .detect { |leg| leg['serviceId'].present? }
-                    &.fetch('serviceId', nil)
-
-    # Construct the itinerary hash, but include the start and end times in each leg
-    otp_itin["legs"].each do |leg|
-      leg["startTime"] = Time.at(otp_itin["startTime"].to_i / 1000).in_time_zone
-      leg["endTime"] = Time.at(otp_itin["endTime"].to_i / 1000).in_time_zone
-    end
-
-    # Construct the final itinerary hash
-    {
+                  .detect{ |leg| leg['serviceId'].present? }
+                  &.fetch('serviceId', nil)
+  
+    return {
+      start_time: Time.at(otp_itin["startTime"].to_i/1000).in_time_zone,
+      end_time: Time.at(otp_itin["endTime"].to_i/1000).in_time_zone,
       transit_time: get_transit_time(otp_itin, trip_type),
       walk_time: get_walk_time(otp_itin, trip_type),
       wait_time: get_wait_time(otp_itin),
       walk_distance: get_walk_distance(otp_itin),
       cost: extract_cost(otp_itin, trip_type),
-      legs: otp_itin["legs"], # Access legs as an array
+      legs: otp_itin["legs"],
       trip_type: trip_type,
       service_id: service_id
     }
-
   end    
   
 
 
   # Modifies OTP Itin's legs, inserting information about 1-Click services
   def associate_legs_with_services(otp_itin)
-    Rails.logger.info "otp_itin before associated with services: #{otp_itin}"
-    
     otp_itin["legs"] ||= []  
     otp_itin["legs"].map! do |leg|
-      # Extract agency details from the nested structure within `route`
-      agency_id = leg.dig("route", "agency", "gtfsId")
-      agency_name = leg.dig("route", "agency", "name")
-  
-      # Pass the extracted agency details to the service lookup function
-      svc = get_associated_service_for(agency_id, agency_name)
+      svc = get_associated_service_for(leg)
   
       # Adjust the mode if it's paratransit and not set correctly
       if !leg['mode'].include?('FLEX') && leg['boardRule'] == 'mustPhone'
@@ -231,12 +216,12 @@ class OTPAmbassador
         leg['serviceLogoUrl'] = svc.full_logo_url
         leg['serviceFullLogoUrl'] = svc.full_logo_url(nil) # actual size
       else
-        leg['serviceName'] = agency_name || agency_id
+        leg['serviceName'] = (leg['agencyName'] || leg['agencyId'])
       end
   
       leg
     end
-  end
+  end  
   
   def get_associated_service_for(agency_id, agency_name)
     
