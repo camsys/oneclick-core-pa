@@ -53,6 +53,10 @@ class OTPAmbassador
     prepare_http_requests.each do |request|
       @http_request_bundler.add(request[:label], request[:url], request[:action])
     end
+
+    Rails.logger.info("Initializing OTPAmbassador with trip_types: #{@trip_types}")
+    Rails.logger.info("Trip type dictionary in use: #{@trip_type_dictionary}")
+
   end
 
   # Packages and returns any errors that came back with a given trip request
@@ -81,7 +85,8 @@ class OTPAmbassador
       @trip.arrive_by,
       options = {}
     )
-  
+    Rails.logger.info("Fetching itineraries for trip type: #{trip_type}")
+
     # Log the full response to compare with previous responses
     Rails.logger.info "Full GraphQL response: #{response.inspect}"
   
@@ -181,6 +186,10 @@ class OTPAmbassador
 
   def convert_itinerary(otp_itin, trip_type)
     associate_legs_with_services(otp_itin)
+
+    Rails.logger.info("Converting OTP itinerary: #{otp_itin.inspect}")
+    Rails.logger.info("Assigned trip type for this itinerary: #{trip_type}")
+
   
     itin_has_invalid_leg = otp_itin["legs"].detect{ |leg| 
       leg['serviceName'] && leg['serviceId'].nil?
