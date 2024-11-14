@@ -169,27 +169,18 @@ class OTPAmbassador
     associate_legs_with_services(otp_itin)
   
     Rails.logger.info("Converting itinerary: #{otp_itin.inspect}")
-    
-    itin_has_invalid_leg = otp_itin["legs"].detect { |leg| leg['serviceName'] && leg['serviceId'].nil? }
-    return nil if itin_has_invalid_leg
   
     service_id = otp_itin["legs"].detect { |leg| leg['serviceId'].present? }&.fetch('serviceId', nil)
+    start_time = otp_itin["legs"].first["from"]["departureTime"]
+    end_time = otp_itin["legs"].last["to"]["arrivalTime"]
   
-    # Extract start and end time, add logs to confirm extraction
-    start_time = otp_itin["startTime"]
-    end_time = otp_itin["endTime"]
+    # Set startTime and endTime in the first and last legs for UI compatibility
+    otp_itin["legs"].first["startTime"] = start_time
+    otp_itin["legs"].last["endTime"] = end_time
   
-    Rails.logger.info("Extracted start_time (ms): #{start_time}, end_time (ms): #{end_time}")
-  
-    # Convert to Time objects and log the converted times
-    start_time_converted = Time.at(start_time.to_i / 1000).in_time_zone
-    end_time_converted = Time.at(end_time.to_i / 1000).in_time_zone
-  
-    Rails.logger.info("Converted start_time: #{start_time_converted}, end_time: #{end_time_converted}")
-  
-    itinerary_hash = {
-      start_time: start_time_converted,
-      end_time: end_time_converted,
+    {
+      start_time: Time.at(start_time.to_i / 1000).in_time_zone,
+      end_time: Time.at(end_time.to_i / 1000).in_time_zone,
       transit_time: get_transit_time(otp_itin, trip_type),
       walk_time: get_walk_time(otp_itin, trip_type),
       wait_time: get_wait_time(otp_itin),
@@ -199,11 +190,7 @@ class OTPAmbassador
       trip_type: trip_type,
       service_id: service_id
     }
-  
-    Rails.logger.info("Final itinerary hash to return: #{itinerary_hash.inspect}")
-    itinerary_hash
   end
-  
   
 
 
