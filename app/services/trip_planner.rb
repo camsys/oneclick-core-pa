@@ -161,19 +161,21 @@ class TripPlanner
 
   # Additional sanity checks can be applied here.
   def filter_itineraries
+    Rails.logger.info("Filtering itineraries down to the best options")
     walk_seen = false
     max_walk_minutes = Config.max_walk_minutes
     max_walk_distance = Config.max_walk_distance
     itineraries = @trip.itineraries.map do |itin|
-
       ## Test: Make sure we never exceed the maximium walk time
       if itin.walk_time and itin.walk_time > max_walk_minutes*60
+        Rails.logger.info("Walk time exceeded for itinerary: #{itin.inspect}")
         next
       end
 
       ## Test: Make sure that we only ever return 1 walk trip
       if itin.walk_time and itin.duration and itin.walk_time == itin.duration 
         if walk_seen
+          Rails.logger.info("Walk trip already seen, skipping itinerary: #{itin.inspect}")
           next 
         else 
           walk_seen = true 
@@ -184,17 +186,20 @@ class TripPlanner
       if !@trip.itineraries.map(&:trip_type).include?('walk') && itin.trip_type == 'transit' && 
         itin.legs.all? { |leg| leg['mode'] == 'WALK' } && 
         itin.walk_distance >= itin.legs.first['distance']
+        Rails.logger.info("Walk-only itinerary found, skipping: #{itin.inspect}")
       next
       end
 
       # Test: Filter out itineraries where user has de-selected walking as a trip type, kept transit, and any walking leg in the transit trip exceeds the maximum walk distance
       if !@trip.itineraries.map(&:trip_type).include?('walk') && itin.trip_type == 'transit' && itin.legs.detect { |leg| leg['mode'] == 'WALK' && leg["distance"] > max_walk_distance }
+        Rails.logger.info("Walk leg exceeds maximum walk distance, skipping: #{itin.inspect}")
         next
       end
 
       # Test: Only apply max_walk_distance if walking is not selected as a trip type
       if !@trip.itineraries.map(&:trip_type).include?('walk')
         if itin.trip_type == 'transit' && itin.legs.any? { |leg| leg['mode'] == 'WALK' && leg["distance"] > max_walk_distance }
+          Rails.logger.info("Walk leg exceeds maximum walk distance, skipping: #{itin.inspect}")
           next
         end
       end
