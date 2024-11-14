@@ -261,23 +261,19 @@ end
       return otp_itin["walkTime"]
     else
       Rails.logger.info("Calculating transit time for trip type: #{trip_type}")
-
+  
       # Define acceptable transit modes
       transit_modes = ["TRANSIT", "BUS", "TRAM", "RAIL", "SUBWAY", "FERRY"]
-
+  
       # Initialize total transit time
       total_transit_time = 0
 
-      # Iterate over each leg in the itinerary
       otp_itin["legs"].each do |leg|
         Rails.logger.info("Leg mode: #{leg['mode']}")
 
-        # Check if the leg mode is one of the transit modes
         if transit_modes.include?(leg["mode"])
-          # Try to use startTime and endTime first, otherwise fall back to departureTime and arrivalTime
-          start_time = leg["startTime"] || leg["from"]["departureTime"]
-          end_time = leg["endTime"] || leg["to"]["arrivalTime"]
-
+          start_time = leg["startTime"]
+          end_time = leg["endTime"]
           # Calculate duration if start and end times are present
           if start_time && end_time
             leg_duration = (end_time - start_time) / 1000 # Convert milliseconds to seconds
