@@ -167,27 +167,18 @@ class OTPAmbassador
 
   def convert_itinerary(otp_itin, trip_type)
     associate_legs_with_services(otp_itin)
-  
-    Rails.logger.info("Converting OTP itinerary: #{otp_itin.inspect}")
-  
-    # Determine the correct trip_type based on the legs' modes
-    if otp_itin["legs"].all? { |leg| leg["mode"] == "WALK" }
-      trip_type = :walk
-    elsif otp_itin["legs"].any? { |leg| leg["mode"].include?("BUS") || leg["mode"].include?("TRANSIT") }
-      trip_type = :transit
-    end
 
-    Rails.logger.info("Assigned trip type for this itinerary after leg evaluation: #{trip_type}")
+    Rails.logger.info("Converting OTP itinerary: #{otp_itin.inspect}")
+    Rails.logger.info("Assigned trip type for this itinerary: #{trip_type}")
+
   
-    # Check for invalid legs (legs with service name but missing service ID)
-    itin_has_invalid_leg = otp_itin["legs"].detect do |leg| 
+    itin_has_invalid_leg = otp_itin["legs"].detect{ |leg| 
       leg['serviceName'] && leg['serviceId'].nil?
-    end
+    }
     return nil if itin_has_invalid_leg
   
-    # Fetch the service ID from the legs if available
     service_id = otp_itin["legs"]
-                  .detect { |leg| leg['serviceId'].present? }
+                  .detect{ |leg| leg['serviceId'].present? }
                   &.fetch('serviceId', nil)
   
     return {
@@ -203,7 +194,6 @@ class OTPAmbassador
       service_id: service_id
     }
   end
-  
   
 
 
