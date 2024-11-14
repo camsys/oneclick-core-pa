@@ -178,6 +178,8 @@ class OTPAmbassador
   
     start_time = otp_itin["legs"].first["from"]["departureTime"]
     end_time = otp_itin["legs"].last["to"]["arrivalTime"]
+
+    Rails.logger.info("Start time: #{start_time}, End time: #{end_time}")
   
     return {
       start_time: Time.at(start_time.to_i / 1000).in_time_zone,
