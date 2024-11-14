@@ -214,6 +214,7 @@ class TripPlanner
 
   # Calls the requisite trip_type itineraries method
   def build_itineraries(otp_response)
+    Rails.logger.info("Building itineraries for trip_type: #{otp_response}")
     otp_response["data"]["plan"]["itineraries"].map do |otp_itin|
       trip_type = determine_trip_type(otp_itin)
       convert_itinerary(otp_itin, trip_type)
