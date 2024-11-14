@@ -196,7 +196,7 @@ class OTPAmbassador
 def associate_legs_with_services(otp_itin)
   Rails.logger.info "Inspecting OTP itinerary structure: #{otp_itin.inspect}"
 
-  itineraries = otp_itin['itineraries'] || otp_itin.dig('plan', 'itineraries')
+  itineraries = otp_itin.itinerary['itineraries'] || otp_itin.itinerary.dig('plan', 'itineraries')
   
   if itineraries.nil?
     Rails.logger.error("Error: Expected 'itineraries' array missing from otp_itin. Check structure.")
