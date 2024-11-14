@@ -167,23 +167,21 @@ class OTPAmbassador
 
   def convert_itinerary(otp_itin, trip_type)
     associate_legs_with_services(otp_itin)
-
+  
     Rails.logger.info("Converting OTP itinerary: #{otp_itin.inspect}")
     Rails.logger.info("Assigned trip type for this itinerary: #{trip_type}")
-
   
-    itin_has_invalid_leg = otp_itin["legs"].detect{ |leg| 
-      leg['serviceName'] && leg['serviceId'].nil?
-    }
+    itin_has_invalid_leg = otp_itin["legs"].detect { |leg| leg['serviceName'] && leg['serviceId'].nil? }
     return nil if itin_has_invalid_leg
   
-    service_id = otp_itin["legs"]
-                  .detect{ |leg| leg['serviceId'].present? }
-                  &.fetch('serviceId', nil)
+    service_id = otp_itin["legs"].detect { |leg| leg['serviceId'].present? }&.fetch('serviceId', nil)
+  
+    start_time = otp_itin["legs"].first["from"]["departureTime"]
+    end_time = otp_itin["legs"].last["to"]["arrivalTime"]
   
     return {
-      start_time: Time.at(otp_itin["startTime"].to_i/1000).in_time_zone,
-      end_time: Time.at(otp_itin["endTime"].to_i/1000).in_time_zone,
+      start_time: Time.at(start_time.to_i / 1000).in_time_zone,
+      end_time: Time.at(end_time.to_i / 1000).in_time_zone,
       transit_time: get_transit_time(otp_itin, trip_type),
       walk_time: get_walk_time(otp_itin, trip_type),
       wait_time: get_wait_time(otp_itin),
