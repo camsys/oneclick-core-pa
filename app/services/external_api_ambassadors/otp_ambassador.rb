@@ -167,23 +167,29 @@ class OTPAmbassador
 
   def convert_itinerary(otp_itin, trip_type)
     associate_legs_with_services(otp_itin)
-
-    Rails.logger.info("Converting itinerary: #{otp_itin.inspect}")
   
-    itin_has_invalid_leg = otp_itin["legs"].detect{ |leg| 
-      leg['serviceName'] && leg['serviceId'].nil?
-    }
+    Rails.logger.info("Converting itinerary: #{otp_itin.inspect}")
+    
+    itin_has_invalid_leg = otp_itin["legs"].detect { |leg| leg['serviceName'] && leg['serviceId'].nil? }
     return nil if itin_has_invalid_leg
   
-    service_id = otp_itin["legs"]
-                  .detect{ |leg| leg['serviceId'].present? }
-                  &.fetch('serviceId', nil)
-    # Try to use starttime and endtime first, otherwise fall back to departureTime and arrivalTime
-
+    service_id = otp_itin["legs"].detect { |leg| leg['serviceId'].present? }&.fetch('serviceId', nil)
   
-    return {
-      start_time: Time.at(otp_itin["startTime"].to_i/1000).in_time_zone,
-      end_time: Time.at(otp_itin["endTime"].to_i/1000).in_time_zone,
+    # Extract start and end time, add logs to confirm extraction
+    start_time = otp_itin["startTime"]
+    end_time = otp_itin["endTime"]
+  
+    Rails.logger.info("Extracted start_time (ms): #{start_time}, end_time (ms): #{end_time}")
+  
+    # Convert to Time objects and log the converted times
+    start_time_converted = Time.at(start_time.to_i / 1000).in_time_zone
+    end_time_converted = Time.at(end_time.to_i / 1000).in_time_zone
+  
+    Rails.logger.info("Converted start_time: #{start_time_converted}, end_time: #{end_time_converted}")
+  
+    itinerary_hash = {
+      start_time: start_time_converted,
+      end_time: end_time_converted,
       transit_time: get_transit_time(otp_itin, trip_type),
       walk_time: get_walk_time(otp_itin, trip_type),
       wait_time: get_wait_time(otp_itin),
@@ -193,9 +199,11 @@ class OTPAmbassador
       trip_type: trip_type,
       service_id: service_id
     }
-
-    Rails.logger.info("Converted itinerary: #{itin.inspect}")
+  
+    Rails.logger.info("Final itinerary hash to return: #{itinerary_hash.inspect}")
+    itinerary_hash
   end
+  
   
 
 
