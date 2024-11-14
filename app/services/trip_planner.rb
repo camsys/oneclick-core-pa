@@ -144,7 +144,12 @@ class TripPlanner
   
   # Builds itineraries for all trip types
   def build_all_itineraries
-    trip_itineraries = @trip_types.flat_map {|t| build_itineraries(t)}
+    Rails.logger.info("Building itineraries for each trip type: #{@trip_types}")
+    trip_itineraries = @trip_types.flat_map do |t| 
+      Rails.logger.info("Calling build_itineraries for trip_type: #{t}")
+      build_itineraries(t)
+    end
+    Rails.logger.info("Built itineraries for all trip types: #{trip_itineraries.map(&:inspect)}")
     new_itineraries = trip_itineraries.reject(&:persisted?)
     old_itineraries = trip_itineraries.select(&:persisted?)
 
