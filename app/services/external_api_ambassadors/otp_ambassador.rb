@@ -166,30 +166,33 @@ class OTPAmbassador
 
   def convert_itinerary(otp_itin, trip_type)
     associate_legs_with_services(otp_itin)
-    
+
     Rails.logger.info("Converting OTP itinerary: #{otp_itin.inspect}")
-    
-    # Determine if any leg within this itinerary is a transit leg
-    contains_transit_leg = otp_itin["legs"].any? { |leg| ["BUS", "RAIL", "TRAM", "SUBWAY", "FERRY", "TRANSIT"].include?(leg["mode"]) }
-    
-    # Override trip type if any transit leg is found
-    effective_trip_type = contains_transit_leg ? :transit : trip_type
-    Rails.logger.info("Assigned trip type for this itinerary: #{effective_trip_type}")
+    Rails.logger.info("Assigned trip type for this itinerary: #{trip_type}")
+
   
-    {
-      start_time: Time.at(otp_itin["startTime"].to_i / 1000).in_time_zone,
-      end_time: Time.at(otp_itin["endTime"].to_i / 1000).in_time_zone,
-      transit_time: get_transit_time(otp_itin, effective_trip_type),
-      walk_time: get_walk_time(otp_itin, effective_trip_type),
+    itin_has_invalid_leg = otp_itin["legs"].detect{ |leg| 
+      leg['serviceName'] && leg['serviceId'].nil?
+    }
+    return nil if itin_has_invalid_leg
+  
+    service_id = otp_itin["legs"]
+                  .detect{ |leg| leg['serviceId'].present? }
+                  &.fetch('serviceId', nil)
+  
+    return {
+      start_time: Time.at(otp_itin["startTime"].to_i/1000).in_time_zone,
+      end_time: Time.at(otp_itin["endTime"].to_i/1000).in_time_zone,
+      transit_time: get_transit_time(otp_itin, trip_type),
+      walk_time: get_walk_time(otp_itin, trip_type),
       wait_time: get_wait_time(otp_itin),
       walk_distance: get_walk_distance(otp_itin),
-      cost: extract_cost(otp_itin, effective_trip_type),
+      cost: extract_cost(otp_itin, trip_type),
       legs: otp_itin["legs"],
-      trip_type: effective_trip_type,
-      service_id: otp_itin["legs"].find { |leg| leg['serviceId'] }&.fetch('serviceId', nil)
+      trip_type: trip_type,
+      service_id: service_id
     }
   end
-  
   
 
 
