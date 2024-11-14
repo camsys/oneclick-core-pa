@@ -5,7 +5,7 @@ class OTPAmbassador
 
   # Translates 1-click trip_types into OTP mode requests
   TRIP_TYPE_DICTIONARY = {
-    transit:      { label: :otp_transit, modes: "TRANSIT" },
+    transit:      { label: :otp_transit, modes: "TRANSIT,WALK" },
     paratransit:  { label: :otp_paratransit, modes: "CAR" },
     car_park:     { label: :otp_car_park, modes: "" },
     taxi:         { label: :otp_car, modes: "CAR" },
@@ -17,7 +17,7 @@ class OTPAmbassador
   }
 
   TRIP_TYPE_DICTIONARY_V2 = {
-    transit:      { label: :otp_transit, modes: "TRANSIT" },
+    transit:      { label: :otp_transit, modes: "TRANSIT,WALK" },
     paratransit:  { label: :otp_paratransit, modes: "TRANSIT,WALK,FLEX_ACCESS,FLEX_EGRESS,FLEX_DIRECT" },
     car_park:     { label: :otp_car_park, modes: "CAR_PARK,TRANSIT,WALK" },
     taxi:         { label: :otp_car, modes: "CAR" },
