@@ -167,6 +167,8 @@ class OTPAmbassador
 
   def convert_itinerary(otp_itin, trip_type)
     associate_legs_with_services(otp_itin)
+
+    Rails.logger.info("Converting itinerary: #{otp_itin.inspect}")
   
     itin_has_invalid_leg = otp_itin["legs"].detect{ |leg| 
       leg['serviceName'] && leg['serviceId'].nil?
@@ -176,6 +178,8 @@ class OTPAmbassador
     service_id = otp_itin["legs"]
                   .detect{ |leg| leg['serviceId'].present? }
                   &.fetch('serviceId', nil)
+    # Try to use starttime and endtime first, otherwise fall back to departureTime and arrivalTime
+
   
     return {
       start_time: Time.at(otp_itin["startTime"].to_i/1000).in_time_zone,
