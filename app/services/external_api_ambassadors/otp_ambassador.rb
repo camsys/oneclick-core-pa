@@ -49,14 +49,17 @@ class OTPAmbassador
     }.compact.uniq
     @otp = OTPService.new(Config.open_trip_planner, otp_version)
 
-    # add http calls to bundler based on trip and modes
-    prepare_http_requests.each do |request|
-      @http_request_bundler.add(request[:label], request[:url], request[:action])
-    end
+    # Prepare the OTP call and store the response for later access
+    @otp_response = @otp.plan(
+      [@trip.origin.lat, @trip.origin.lng],
+      [@trip.destination.lat, @trip.destination.lng],
+      @trip.trip_time,
+      @trip.arrive_by
+    )
 
     Rails.logger.info("Initializing OTPAmbassador with trip_types: #{@trip_types}")
     Rails.logger.info("Trip type dictionary in use: #{@trip_type_dictionary}")
-
+    Rails.logger.info("OTP response initialized: #{@otp_response.inspect}")
   end
 
   # Packages and returns any errors that came back with a given trip request
@@ -77,9 +80,10 @@ class OTPAmbassador
   end
 
   def get_itineraries(trip_type)
-    return [] if errors(trip_type)
-    itineraries = ensure_response(trip_type).itineraries
-    return itineraries.map {|i| convert_itinerary(i, trip_type)}.compact
+    # Validate response and extract itineraries
+    Rails.logger.info("otp_response: #{@otp_response.inspect}")
+    itineraries = @otp_response.dig("data", "plan", "itineraries") || []
+    itineraries.map { |i| convert_itinerary(i, trip_type) }.compact
   end
   
 
@@ -196,19 +200,20 @@ class OTPAmbassador
 def associate_legs_with_services(otp_itin)
   Rails.logger.info "Inspecting OTP itinerary structure: #{otp_itin.inspect}"
 
-  itineraries = otp_itin.itinerary['itineraries'] || otp_itin.itinerary.dig('plan', 'itineraries')
+  itineraries = otp_itin['itineraries'] || otp_itin.dig('plan', 'itineraries')
   
   if itineraries.nil?
     Rails.logger.error("Error: Expected 'itineraries' array missing from otp_itin. Check structure.")
     return
   end
 
-  # Process each itinerary and its legs if itineraries are present
+  # Proceed if itineraries are found
   itineraries.each do |itinerary|
     itinerary['legs'] ||= []
 
-   itinerary['legs'] = itinerary['legs'].map do |leg|
+    itinerary['legs'] = itinerary['legs'].map do |leg|
       svc = get_associated_service_for(leg)
+
       if !leg['mode'].include?('FLEX') && leg['boardRule'] == 'mustPhone'
         leg['mode'] = 'FLEX_ACCESS'
       end
