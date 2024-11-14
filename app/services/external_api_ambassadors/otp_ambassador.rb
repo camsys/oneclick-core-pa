@@ -207,14 +207,13 @@ def associate_legs_with_services(otp_itin)
   itineraries.each do |itinerary|
     itinerary['legs'] ||= []
 
-=    itinerary['legs'] = itinerary['legs'].map do |leg|
+   itinerary['legs'] = itinerary['legs'].map do |leg|
       svc = get_associated_service_for(leg)
-
-=      if !leg['mode'].include?('FLEX') && leg['boardRule'] == 'mustPhone'
+      if !leg['mode'].include?('FLEX') && leg['boardRule'] == 'mustPhone'
         leg['mode'] = 'FLEX_ACCESS'
       end
 
-=      if svc
+      if svc
         leg['serviceId'] = svc.id
         leg['serviceName'] = svc.name
         leg['serviceFareInfo'] = svc.url
