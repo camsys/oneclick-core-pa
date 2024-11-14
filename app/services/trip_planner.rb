@@ -213,17 +213,12 @@ class TripPlanner
   
 
   # Calls the requisite trip_type itineraries method
-  def build_itineraries(otp_response)
-    Rails.logger.info("Building itineraries for trip_type: #{otp_response}")
-    otp_response["data"]["plan"]["itineraries"].map do |otp_itin|
-      trip_type = determine_trip_type(otp_itin)
-      convert_itinerary(otp_itin, trip_type)
-    end
-  end
-  
-  def determine_trip_type(otp_itin)
-    has_transit_leg = otp_itin["legs"].any? { |leg| ["TRANSIT", "BUS", "TRAM", "RAIL", "SUBWAY", "FERRY"].include?(leg["mode"]) }
-    has_transit_leg ? :transit : :walk
+  def build_itineraries(trip_type)
+    Rails.logger.info("Building itineraries for trip_type: #{trip_type}")
+    catch_errors(trip_type)
+    result = self.send("build_#{trip_type}_itineraries")
+    Rails.logger.info("Finished building #{trip_type} itineraries: #{result}")
+    result
   end
   
 
