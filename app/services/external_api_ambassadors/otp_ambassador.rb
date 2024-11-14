@@ -173,21 +173,21 @@ class OTPAmbassador
     # Determine the correct trip_type based on the legs' modes
     if otp_itin["legs"].all? { |leg| leg["mode"] == "WALK" }
       trip_type = :walk
-    elsif otp_itin["legs"].any? { |leg| ["BUS", "TRANSIT"].include?(leg["mode"]) }
+    elsif otp_itin["legs"].any? { |leg| leg["mode"].include?("BUS") || leg["mode"].include?("TRANSIT") }
       trip_type = :transit
     end
-  
+
     Rails.logger.info("Assigned trip type for this itinerary after leg evaluation: #{trip_type}")
   
     # Check for invalid legs (legs with service name but missing service ID)
     itin_has_invalid_leg = otp_itin["legs"].detect do |leg| 
       leg['serviceName'] && leg['serviceId'].nil?
     end
-
     return nil if itin_has_invalid_leg
   
+    # Fetch the service ID from the legs if available
     service_id = otp_itin["legs"]
-                  .detect{ |leg| leg['serviceId'].present? }
+                  .detect { |leg| leg['serviceId'].present? }
                   &.fetch('serviceId', nil)
   
     return {
@@ -203,6 +203,7 @@ class OTPAmbassador
       service_id: service_id
     }
   end
+  
   
 
 
