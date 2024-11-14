@@ -80,6 +80,7 @@ class OTPAmbassador
   end
 
   def get_itineraries(trip_type)
+    Rails.logger.info("The trip type being passed into the get_itineraries method is: #{trip_type}")
     # Validate response and extract itineraries
     Rails.logger.info("otp_response: #{@otp_response.inspect}")
     itineraries = @otp_response.dig("data", "plan", "itineraries") || []
