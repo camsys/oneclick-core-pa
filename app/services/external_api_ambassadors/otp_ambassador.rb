@@ -253,49 +253,46 @@ end
   end  
    
 
-  # Calculates the total time spent on transit legs with logger statements for debugging
+  # Calculates the total time spent on transit legs
   def get_transit_time(otp_itin, trip_type)
-    
-    if trip_type.in? [:car, :bicycle]
-      Rails.logger.info("Trip type is #{trip_type}, returning walkTime: #{otp_itin['walkTime']}")
-      return otp_itin["walkTime"]
-    else
-      Rails.logger.info("Calculating transit time for trip type: #{trip_type}")
+    if trip_type == :paratransit
+      # Fallback to itinerary duration for paratransit
+      Rails.logger.info("Fallback to itinerary duration for paratransit trip.")
+      return otp_itin["duration"]
+    end
 
-      # Define acceptable transit modes
-      transit_modes = ["TRANSIT", "BUS", "TRAM", "RAIL", "SUBWAY", "FERRY", "FLEX_ACCESS", "FLEX_DIRECT"]
+    # Define acceptable transit modes
+    transit_modes = ["TRANSIT", "BUS", "TRAM", "RAIL", "SUBWAY", "FERRY", "FLEX_ACCESS", "FLEX_DIRECT"]
 
-      # Initialize total transit time
-      total_transit_time = 0
+    # Initialize total transit time
+    total_transit_time = 0
 
-      # Iterate over each leg in the itinerary
+    # Process legs if present
+    if otp_itin["legs"]
       otp_itin["legs"].each do |leg|
         Rails.logger.info("Leg mode: #{leg['mode']}")
 
-        # Check if the leg mode is one of the transit modes
         if transit_modes.include?(leg["mode"])
-          # Try to use startTime and endTime first, otherwise fall back to departureTime and arrivalTime
+          # Use startTime and endTime for leg duration
           start_time = leg["startTime"] || leg["from"]["departureTime"]
           end_time = leg["endTime"] || leg["to"]["arrivalTime"]
 
-          # Calculate duration if start and end times are present
           if start_time && end_time
             leg_duration = (end_time - start_time) / 1000 # Convert milliseconds to seconds
-            Rails.logger.info("Transit leg found with startTime: #{start_time}, endTime: #{end_time}, duration (s): #{leg_duration}")
+            Rails.logger.info("Transit leg found with duration: #{leg_duration} seconds")
             total_transit_time += leg_duration
           else
-            Rails.logger.warn("Missing start or end time for transit leg: #{leg.inspect}")
+            Rails.logger.warn("Missing start or end time for leg: #{leg.inspect}")
           end
-        else
-          Rails.logger.info("Non-transit leg skipped with mode: #{leg['mode']}")
         end
       end
-
-      Rails.logger.info("Total transit time calculated: #{total_transit_time} seconds")
-      return total_transit_time
+    else
+      Rails.logger.warn("No legs present in itinerary.")
     end
+
+    Rails.logger.info("Total transit time calculated: #{total_transit_time} seconds")
+    total_transit_time
   end
-  
 
   # OTP returns car and bicycle time as walk time
   def get_walk_time otp_itin, trip_type
