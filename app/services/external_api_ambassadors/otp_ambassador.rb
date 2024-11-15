@@ -256,9 +256,14 @@ end
   # Calculates the total time spent on transit legs
   def get_transit_time(otp_itin, trip_type)
     if trip_type == :paratransit
-      # Fallback to itinerary duration for paratransit
-      Rails.logger.info("Fallback to itinerary duration for paratransit trip.")
-      return otp_itin["duration"]
+      if otp_itin["duration"]
+        Rails.logger.info("Paratransit trip detected. Using top-level duration: #{otp_itin['duration']}")
+        Rails.logger.info("otp_itin: #{otp_itin.inspect}")
+        return otp_itin["duration"]
+      else
+        Rails.logger.warn("Paratransit trip missing duration. Defaulting to 0.")
+        return 0
+      end
     end
 
     # Define acceptable transit modes
