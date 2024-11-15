@@ -262,7 +262,7 @@ end
       Rails.logger.info("Calculating transit time for trip type: #{trip_type}")
 
       # Define acceptable transit modes
-      transit_modes = ["TRANSIT", "BUS", "TRAM", "RAIL", "SUBWAY", "FERRY"]
+      transit_modes = ["TRANSIT", "BUS", "TRAM", "RAIL", "SUBWAY", "FERRY", "FLEX_ACCESS", "FLEX_DIRECT"]
 
       # Initialize total transit time
       total_transit_time = 0
