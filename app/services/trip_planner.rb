@@ -261,6 +261,7 @@ class TripPlanner
       # This ensures we respect accomodations and eligibilities
       otp_itineraries = build_fixed_itineraries(:paratransit).select{ |itin|
         itin.service_id.present?
+        Rails.logger.info("Paratransit itinerary: #{itin.inspect}")
       }
       
       # paratransit itineraries can return just transit since we also look for a mixed
