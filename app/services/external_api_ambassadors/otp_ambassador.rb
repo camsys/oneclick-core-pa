@@ -189,7 +189,8 @@ class OTPAmbassador
       cost: extract_cost(otp_itin, trip_type),
       legs: otp_itin["legs"],
       trip_type: trip_type,
-      service_id: service_id
+      service_id: service_id,
+      duration: otp_itin["duration"],
     }
   end
   
