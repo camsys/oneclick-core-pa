@@ -92,6 +92,7 @@ class OTPAmbassador
   def get_duration(trip_type)
     return 0 if errors(trip_type)
     itineraries = ensure_response(trip_type).itineraries
+    Rails.logger.info("Itineraries for trip type #{trip_type}: #{itineraries.inspect}")
     return itineraries[0]["duration"] if itineraries[0]
     0
   end
