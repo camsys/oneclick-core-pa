@@ -182,7 +182,7 @@ class OTPAmbassador
     {
       start_time: Time.at(start_time.to_i / 1000).in_time_zone,
       end_time: Time.at(end_time.to_i / 1000).in_time_zone,
-      transit_time: get_transit_time(otp_itin, trip_type),
+      transit_time: get_transit_time(otp_itin, trip_type) || otp_itin["duration"],
       walk_time: get_walk_time(otp_itin, trip_type),
       wait_time: get_wait_time(otp_itin),
       walk_distance: get_walk_distance(otp_itin),
@@ -190,7 +190,6 @@ class OTPAmbassador
       legs: otp_itin["legs"],
       trip_type: trip_type,
       service_id: service_id,
-      duration: otp_itin["duration"],
     }
   end
   
