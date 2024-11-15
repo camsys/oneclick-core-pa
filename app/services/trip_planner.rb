@@ -254,66 +254,61 @@ class TripPlanner
   def build_paratransit_itineraries
     return [] unless @available_services[:paratransit].present?  # Ensure there are paratransit services available
   
+    # Initialize array to store itineraries
     router_paratransit_itineraries = []
   
-    # If Open Trip Planner v2, use specific handling for paratransit itineraries
-    if Config.open_trip_planner_version == 'v2'
-      otp_itineraries = build_fixed_itineraries(:paratransit).select { |itin|
-        itin.service_id.present?  # Filter itineraries that have a service_id
-      }
+    # Ensure OTP response contains itineraries and process them
+    if @otp_response.dig("data", "plan", "itineraries").present?
+      otp_itineraries = @otp_response.dig("data", "plan", "itineraries")
   
-      # Filter out itineraries that don't have paratransit in the legs
-      router_paratransit_itineraries += otp_itineraries.map { |itin|
-        no_paratransit = true
-        has_transit = false
-        itin.legs.each do |leg|
-          no_paratransit = false if leg['mode'].include?('FLEX')  # Check for paratransit FLEX mode
-          has_transit = true unless leg['mode'].include?('FLEX') || leg['mode'] == 'WALK'
+      # Iterate over OTP itineraries and convert to local itinerary objects
+      otp_itineraries.each do |otp_itinerary|
+        # Skip itineraries without required data
+        next unless otp_itinerary["legs"].present?
+  
+        # Create new itinerary for each OTP itinerary
+        itinerary = Itinerary.new(
+          trip_id: @trip.id,
+          trip_type: :paratransit,
+          service_id: @available_services[:paratransit].first.id,
+          start_time: Time.at(otp_itinerary["startTime"] / 1000), # Convert from milliseconds to seconds
+          end_time: Time.at(otp_itinerary["endTime"] / 1000), # Convert from milliseconds to seconds
+          duration: otp_itinerary["duration"],
+          walk_time: otp_itinerary["walkTime"],
+          waiting_time: otp_itinerary["waitingTime"],
+          walk_distance: otp_itinerary["walkDistance"]
+        )
+  
+        # Process each leg of the itinerary and add relevant details
+        otp_itinerary["legs"].each do |leg|
+          if leg["mode"].include?("FLEX")
+            itinerary.legs ||= []
+            itinerary.legs << {
+              mode: leg["mode"],
+              distance: leg["distance"],
+              from_name: leg["from"]["name"],
+              from_lat: leg["from"]["lat"],
+              from_lon: leg["from"]["lon"],
+              departure_time: Time.at(leg["from"]["departureTime"] / 1000),
+              to_name: leg["to"]["name"],
+              to_lat: leg["to"]["lat"],
+              to_lon: leg["to"]["lon"],
+              arrival_time: Time.at(leg["to"]["arrivalTime"] / 1000)
+            }
+          end
         end
-        if no_paratransit
-          next nil  # Skip itineraries with no paratransit
-        end
-        itin.trip_type = 'paratransit_mixed' if has_transit  # Flag mixed mode itineraries
-        itin
-      }.compact
-    end
   
-    # Fetch available paratransit services
-    paratransit_services = @available_services[:paratransit].where(gtfs_agency_id: ["", nil])
+        # Skip itineraries with no valid legs
+        next if itinerary.legs.nil? || itinerary.legs.empty?
   
-    # Ensure only allowed APIs are used for booking
-    allowed_api = Config.booking_api
-    return router_paratransit_itineraries if allowed_api == "none"
-    unless allowed_api == "all"
-      paratransit_services = paratransit_services.where(booking_api: allowed_api)
-    end
-  
-    # Build itineraries for paratransit services
-    itineraries = paratransit_services.map { |svc|
-      # Skip if no matching user profile
-      if svc.booking_api == "ecolane" && UserBookingProfile.where(service: svc, user: @trip.user).count == 0 && @trip.user.registered?
-        next nil
+        # Save the itinerary
+        itinerary.save
+        router_paratransit_itineraries << itinerary
       end
+    end
   
-      # Find or create a new itinerary for the paratransit service
-      itinerary = Itinerary.left_joins(:booking)
-                            .where(bookings: { id: nil })
-                            .find_or_initialize_by(service_id: svc.id, trip_type: :paratransit, trip_id: @trip.id)
-  
-      # Update the itinerary with cost and duration
-      itinerary.assign_attributes({
-        assistant: @options[:assistant],
-        companions: @options[:companions],
-        cost: svc.fare_for(@trip, router: @router, companions: @options[:companions], assistant: @options[:assistant]),
-        transit_time: @router.get_duration(:paratransit) * @paratransit_drive_time_multiplier
-      })
-  
-      itinerary
-    }.compact
-  
-    # Return all paratransit itineraries
-    router_paratransit_itineraries + itineraries
-  end  
+    router_paratransit_itineraries
+  end   
 
   # Builds taxi itineraries for each service, populates transit_time based on OTP response
   def build_taxi_itineraries
