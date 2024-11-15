@@ -252,20 +252,14 @@ class TripPlanner
 
   # Builds paratransit itineraries for each service, populates transit_time based on OTP response
   def build_paratransit_itineraries
-    return [] unless @available_services[:paratransit].present? # Return an empty array if no paratransit services are available
+    return [] unless @available_services[:paratransit].present?
   
-    # gtfs flex can load paratransit itineraries but not all otp instances have flex
     router_paratransit_itineraries = []
     if Config.open_trip_planner_version == 'v2'
-      # Paratransit itineraries must belong to a service
-      # This ensures we respect accommodations and eligibilities
       otp_itineraries = build_fixed_itineraries(:paratransit).select{ |itin|
         itin.service_id.present?
       }
   
-      # paratransit itineraries can return just transit since we also look for a mixed
-      # filter these out
-      # then set itineraries that are a mix of paratransit and transit mixed
       router_paratransit_itineraries += otp_itineraries.map{ |itin|
         no_paratransit = true
         has_transit = false
@@ -273,14 +267,25 @@ class TripPlanner
           no_paratransit = false if leg['mode'].include?('FLEX')
           has_transit = true unless leg['mode'].include?('FLEX') || leg['mode'] == 'WALK'
         end
-        if no_paratransit
-          next nil
-        end
+  
+        # Logging the OTP itinerary and its leg details
+        Rails.logger.info("OTP Itinerary: #{itin.inspect}")
+        Rails.logger.info("StartTime: #{itin.startTime}, EndTime: #{itin.endTime}")
+  
+        # Skip if no paratransit mode is found
+        next nil if no_paratransit
+  
         itin.trip_type = 'paratransit_mixed' if has_transit
+  
+        # Assign start and end time for the itinerary
+        itin.start_time = itin.startTime
+        itin.end_time = itin.endTime
+  
         itin
       }.compact
     end
   
+    # Now we handle paratransit services
     paratransit_services = @available_services[:paratransit].where(gtfs_agency_id: ["", nil])
   
     allowed_api = Config.booking_api
@@ -292,13 +297,10 @@ class TripPlanner
     itineraries = paratransit_services.map { |svc|
       Rails.logger.info("Checking service id: #{svc&.id}")
   
-      # For FindMyRide, only allow RideShares service to be returned if the user is associated with it.
-      if svc.booking_api == "ecolane" and UserBookingProfile.where(service: svc, user: @trip.user).count == 0 and @trip.user.registered?
-        Rails.logger.info("Skipping service id #{svc.id} because user is not associated with it.")
+      if svc.booking_api == "ecolane" && UserBookingProfile.where(service: svc, user: @trip.user).count == 0 && @trip.user.registered?
         next nil
       end
   
-      # Look for an existing itinerary
       itinerary = Itinerary.left_joins(:booking)
                             .where(bookings: { id: nil })
                             .find_or_initialize_by(
@@ -307,28 +309,25 @@ class TripPlanner
                               trip_id: @trip.id
                             )
   
-      # Log before assigning any data
-      Rails.logger.info("Found or initialized itinerary: #{itinerary.inspect}")
-      
-      # Assign start and end time
+      # Assigning attributes including start_time and end_time from OTP
       itinerary.assign_attributes({
         assistant: @options[:assistant],
         companions: @options[:companions],
         cost: svc.fare_for(@trip, router: @router, companions: @options[:companions], assistant: @options[:assistant]),
-        transit_time: @router.get_duration(:paratransit) * @paratransit_drive_time_multiplier
+        transit_time: @router.get_duration(:paratransit) * @paratransit_drive_time_multiplier,
+        start_time: itin.startTime,  # Corrected
+        end_time: itin.endTime       # Corrected
       })
   
-      # Log the times
-      Rails.logger.info("Assigned transit_time: #{itinerary.transit_time}")
-      Rails.logger.info("Itinerary start_time: #{itinerary.start_time}, end_time: #{itinerary.end_time}")
+      # Logging the final itinerary start and end times
+      Rails.logger.info("Assigned start_time: #{itinerary.start_time}, end_time: #{itinerary.end_time}")
   
       itinerary
     }.compact
   
-    # Combine the router itineraries and the custom ones
     router_paratransit_itineraries + itineraries
-  end  
-
+  end
+  
   # Builds taxi itineraries for each service, populates transit_time based on OTP response
   def build_taxi_itineraries
     return [] unless @available_services[:taxi] # Return an empty array if no taxi services are available
