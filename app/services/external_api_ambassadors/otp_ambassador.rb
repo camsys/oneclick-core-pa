@@ -49,17 +49,10 @@ class OTPAmbassador
     }.compact.uniq
     @otp = OTPService.new(Config.open_trip_planner, otp_version)
 
-    # Prepare the OTP call and store the response for later access
-    @otp_response = @otp.plan(
-      [@trip.origin.lat, @trip.origin.lng],
-      [@trip.destination.lat, @trip.destination.lng],
-      @trip.trip_time,
-      @trip.arrive_by
-    )
-
-    Rails.logger.info("Initializing OTPAmbassador with trip_types: #{@trip_types}")
-    Rails.logger.info("Trip type dictionary in use: #{@trip_type_dictionary}")
-    Rails.logger.info("OTP response initialized: #{@otp_response.inspect}")
+    # add http calls to bundler based on trip and modes
+    prepare_http_requests.each do |request|
+      @http_request_bundler.add(request[:label], request[:url], request[:action])
+    end
   end
 
   # Packages and returns any errors that came back with a given trip request
@@ -80,11 +73,32 @@ class OTPAmbassador
   end
 
   def get_itineraries(trip_type)
-    Rails.logger.info("The trip type being passed into the get_itineraries method is: #{trip_type}")
-    # Validate response and extract itineraries
-    Rails.logger.info("otp_response: #{@otp_response.inspect}")
-    itineraries = @otp_response.dig("data", "plan", "itineraries") || []
-    itineraries.map { |i| convert_itinerary(i, trip_type) }.compact
+    # Use the trip's origin and destination points to plan the trip
+    response = @otp.plan(
+      [@trip.origin.lat, @trip.origin.lng],
+      [@trip.destination.lat, @trip.destination.lng],
+      @trip.trip_time,
+      @trip.arrive_by,
+      options = {}
+    )
+  
+    # Log the full response to compare with previous responses
+    Rails.logger.info "Full GraphQL response: #{response.inspect}"
+  
+    # Return an empty array if there are errors or no plan data
+    unless response["data"] && response["data"]["plan"]
+      Rails.logger.error "No plan data in response: #{response.inspect}"
+      return []
+    end
+  
+    # Log the extracted itineraries for comparison
+    itineraries = response["data"]["plan"]["itineraries"]
+    Rails.logger.info "Extracted itineraries from GraphQL response: #{itineraries.inspect}"
+  
+    # Map and convert each itinerary, compact to remove any nil entries
+    itineraries.map do |i|
+      convert_itinerary(i, trip_type)
+    end.compact
   end
   
 
@@ -92,7 +106,6 @@ class OTPAmbassador
   def get_duration(trip_type)
     return 0 if errors(trip_type)
     itineraries = ensure_response(trip_type).itineraries
-    Rails.logger.info("Itineraries for trip type #{trip_type}: #{itineraries.inspect}")
     return itineraries[0]["duration"] if itineraries[0]
     0
   end
@@ -169,27 +182,26 @@ class OTPAmbassador
   def convert_itinerary(otp_itin, trip_type)
     associate_legs_with_services(otp_itin)
   
-    Rails.logger.info("Converting itinerary: #{otp_itin.inspect}")
+    itin_has_invalid_leg = otp_itin["legs"].detect{ |leg| 
+      leg['serviceName'] && leg['serviceId'].nil?
+    }
+    return nil if itin_has_invalid_leg
   
-    service_id = otp_itin["legs"].detect { |leg| leg['serviceId'].present? }&.fetch('serviceId', nil)
-    start_time = otp_itin["legs"].first["from"]["departureTime"]
-    end_time = otp_itin["legs"].last["to"]["arrivalTime"]
+    service_id = otp_itin["legs"]
+                  .detect{ |leg| leg['serviceId'].present? }
+                  &.fetch('serviceId', nil)
   
-    # Set startTime and endTime in the first and last legs for UI compatibility
-    otp_itin["legs"].first["startTime"] = start_time
-    otp_itin["legs"].last["endTime"] = end_time
-  
-    {
-      start_time: Time.at(start_time.to_i / 1000).in_time_zone,
-      end_time: Time.at(end_time.to_i / 1000).in_time_zone,
-      transit_time: get_transit_time(otp_itin, trip_type) || otp_itin["duration"],
+    return {
+      start_time: Time.at(otp_itin["startTime"].to_i/1000).in_time_zone,
+      end_time: Time.at(otp_itin["endTime"].to_i/1000).in_time_zone,
+      transit_time: get_transit_time(otp_itin, trip_type),
       walk_time: get_walk_time(otp_itin, trip_type),
       wait_time: get_wait_time(otp_itin),
       walk_distance: get_walk_distance(otp_itin),
       cost: extract_cost(otp_itin, trip_type),
       legs: otp_itin["legs"],
       trip_type: trip_type,
-      service_id: service_id,
+      service_id: service_id
     }
   end
   
@@ -261,24 +273,20 @@ end
       return otp_itin["walkTime"]
     else
       Rails.logger.info("Calculating transit time for trip type: #{trip_type}")
-
+  
       # Define acceptable transit modes
-      transit_modes = ["TRANSIT", "BUS", "TRAM", "RAIL", "SUBWAY", "FERRY", "FLEX_ACCESS", "FLEX_DIRECT"]
-
+      transit_modes = ["TRANSIT", "BUS", "TRAM", "RAIL", "SUBWAY", "FERRY"]
+  
       # Initialize total transit time
       total_transit_time = 0
-
-      # Iterate over each leg in the itinerary
+  
       otp_itin["legs"].each do |leg|
         Rails.logger.info("Leg mode: #{leg['mode']}")
-
-        # Check if the leg mode is one of the transit modes
+        
         if transit_modes.include?(leg["mode"])
-          # Try to use startTime and endTime first, otherwise fall back to departureTime and arrivalTime
-          start_time = leg["startTime"] || leg["from"]["departureTime"]
-          end_time = leg["endTime"] || leg["to"]["arrivalTime"]
-
-          # Calculate duration if start and end times are present
+          start_time = leg["startTime"]
+          end_time = leg["endTime"]
+  
           if start_time && end_time
             leg_duration = (end_time - start_time) / 1000 # Convert milliseconds to seconds
             Rails.logger.info("Transit leg found with startTime: #{start_time}, endTime: #{end_time}, duration (s): #{leg_duration}")
@@ -290,7 +298,7 @@ end
           Rails.logger.info("Non-transit leg skipped with mode: #{leg['mode']}")
         end
       end
-
+  
       Rails.logger.info("Total transit time calculated: #{total_transit_time} seconds")
       return total_transit_time
     end
