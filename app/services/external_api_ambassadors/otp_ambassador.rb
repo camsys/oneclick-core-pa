@@ -81,11 +81,16 @@ class OTPAmbassador
 
   def get_itineraries(trip_type)
     Rails.logger.info("The trip type being passed into the get_itineraries method is: #{trip_type}")
+  
     # Validate response and extract itineraries
     Rails.logger.info("otp_response: #{@otp_response.inspect}")
+    
+    # Adjust this part to ensure paratransit modes (including FLEX) are handled
     itineraries = @otp_response.dig("data", "plan", "itineraries") || []
+    itineraries = itineraries.select { |i| i['legs'].any? { |leg| leg['mode'] =~ /FLEX/ } } if trip_type == :paratransit
+    
     itineraries.map { |i| convert_itinerary(i, trip_type) }.compact
-  end
+  end  
   
 
   # Extracts a trip duration from the OTP response.
