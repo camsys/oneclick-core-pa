@@ -29,7 +29,7 @@ class TripPlanner
     
 
 
-    @router = OTPAmbassador.new(
+    @router ||= OTPAmbassador.new(
       @trip,
       @trip_types,
       @http_request_bundler,
