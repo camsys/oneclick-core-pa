@@ -248,6 +248,8 @@ class TripPlanner
       otp_itineraries = build_fixed_itineraries(:paratransit).select{ |itin|
         itin.service_id.present?
       }
+
+      Rails.logger.info("build_paratransit_itineraries method: otp_itineraries: #{otp_itineraries}") 
       
       # paratransit itineraries can return just transit since we also look for a mixed
       # filter these out
