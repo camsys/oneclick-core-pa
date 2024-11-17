@@ -33,7 +33,7 @@ class TripPlanner
       @trip,
       @trip_types,
       @http_request_bundler,
-      (@available_services[:transit] || []) + (@available_services[:paratransit])
+      @available_services[:transit].or(@available_services[:paratransit])
     )    
     Rails.logger.info("Available services grouped by type: #{@available_services.inspect}")
 
@@ -47,15 +47,17 @@ class TripPlanner
   end
 
   def set_available_services
+    @available_services = @master_service_scope.published
     @available_services = @available_services.by_trip_type(*@trip_types)
-    @available_services = @available_services.available_for(@trip, only_by: (@filters - [:purpose, :eligibility, :accommodation]))
-    @available_services = @available_services.available_for(@trip, only_by: (@filters & [:purpose, :eligibility]))
+    @available_services = @available_services.available_for(@trip, only_by: @filters)
     @available_services = available_services_hash(@available_services)
-  end
+  end  
   
   def available_services_hash(services)
-    services.group_by { |s| s.type.underscore.to_sym }
-  end
+    Service::SERVICE_TYPES.map do |t|
+      [t.underscore.to_sym, services.where(type: t)]
+    end.to_h.merge({ all: services })
+  end  
   
 
   def build_all_itineraries
