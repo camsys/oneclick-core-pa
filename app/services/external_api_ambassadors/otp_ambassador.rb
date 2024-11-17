@@ -19,4 +19,3 @@ class OTPAmbassador
     itineraries.first["duration"] if itineraries.present?
   end
 end
-end
