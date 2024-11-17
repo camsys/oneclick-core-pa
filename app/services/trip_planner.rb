@@ -29,7 +29,12 @@ class TripPlanner
     
 
 
-    @router = OTPAmbassador.new(@trip, @trip_types, @http_request_bundler, @available_services[:transit].or(@available_services[:paratransit]))
+    @router = OTPAmbassador.new(
+      @trip,
+      @trip_types,
+      @http_request_bundler,
+      @available_services[:transit]&.or(@available_services[:paratransit])
+    )
   end
 
   def plan
@@ -49,10 +54,13 @@ class TripPlanner
   
     # Group available services by type into a hash
     @available_services = available_services_hash(@available_services)
-  end
+  
+    # Debugging: log the transformed services
+    Rails.logger.info("Grouped available services: #{@available_services.inspect}")
+  end  
   
   def available_services_hash(services)
-    services.group_by(&:type).transform_keys { |type| type.underscore.to_sym }
+    services.group_by { |s| s.type.underscore.to_sym }
   end
   
 
