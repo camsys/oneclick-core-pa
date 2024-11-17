@@ -24,6 +24,10 @@ class TripPlanner
     @except_filters = options[:except_filters] || []
     @filters = @only_filters - @except_filters
 
+    Rails.logger.info("Available transit services: #{@available_services[:transit]}")
+    Rails.logger.info("Available paratransit services: #{@available_services[:paratransit]}")
+
+
     @router = OTPAmbassador.new(@trip, @trip_types, @http_request_bundler, @available_services[:transit].or(@available_services[:paratransit]))
   end
 
