@@ -40,17 +40,21 @@ class TripPlanner
   end
 
   def set_available_services
+    # Start with the scope of all services available for public viewing
     @available_services = @available_services.by_trip_type(*@trip_types)
+  
+    # Apply additional filters if necessary
     @available_services = @available_services.available_for(@trip, only_by: (@filters - [:purpose, :eligibility, :accommodation]))
     @available_services = @available_services.available_for(@trip, only_by: (@filters & [:purpose, :eligibility]))
+  
+    # Group available services by type into a hash
     @available_services = available_services_hash(@available_services)
   end
-
+  
   def available_services_hash(services)
-    Service::SERVICE_TYPES.map do |t|
-      [t.underscore.to_sym, services.where(type: t)]
-    end.to_h.merge({ all: services })
+    services.group_by(&:type).transform_keys { |type| type.underscore.to_sym }
   end
+  
 
   def build_all_itineraries
     trip_itineraries = @trip_types.flat_map { |t| build_itineraries(t) }
