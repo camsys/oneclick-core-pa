@@ -77,6 +77,9 @@ class OTPAmbassador
     return [] if errors(trip_type)
     itineraries = ensure_response(trip_type).itineraries
     return itineraries.map {|i| convert_itinerary(i, trip_type)}.compact
+    if trip_type == :paratransit
+      Rails.logger.info("get_itineraries for #{trip_type}: #{itineraries}")
+    end
   end
 
   # Extracts a trip duration from the OTP response.

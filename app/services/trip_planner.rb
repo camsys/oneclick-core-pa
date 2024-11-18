@@ -248,8 +248,6 @@ class TripPlanner
       otp_itineraries = build_fixed_itineraries(:paratransit).select{ |itin|
         itin.service_id.present?
       }
-
-      Rails.logger.info("build_paratransit_itineraries method: otp_itineraries: #{otp_itineraries}") 
       
       # paratransit itineraries can return just transit since we also look for a mixed
       # filter these out
@@ -388,10 +386,6 @@ class TripPlanner
   # Generic OTP Call
   def build_fixed_itineraries(trip_type)
     itineraries = @router.get_itineraries(trip_type)
-    if trip_type == :paratransit
-      Rails.logger.info("Results from build_fixed_itineraries for #{trip_type}: #{itineraries}")
-    end
-
     itineraries.map { |i| Itinerary.new(i) }
   end
 
