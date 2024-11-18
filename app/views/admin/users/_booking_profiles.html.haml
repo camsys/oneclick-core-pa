@@ -27,6 +27,7 @@
               %td= booking_profile.user.last_name
               %td= booking_profile.details['county']
               %td= booking_profile.service.name if booking_profile.service.present?
+              %td= booking_profile.user.last_sign_in_at&.strftime('%Y-%m-%d %H:%M:%S') || 'Never'
               %td
   -unless hide_footer
     .panel-footer
