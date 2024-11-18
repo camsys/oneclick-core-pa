@@ -15,7 +15,6 @@
             %th Booking ID
             %th First Name
             %th Last Name
-            %th County
             %th Service
             %th Last Sign In
             %th
@@ -25,7 +24,6 @@
               %td= booking_profile.external_user_id
               %td= booking_profile.user.first_name
               %td= booking_profile.user.last_name
-              %td= booking_profile.details['county']
               %td= booking_profile.service.name if booking_profile.service.present?
               %td= booking_profile.user.last_sign_in_at&.strftime('%Y-%m-%d %H:%M:%S') || 'Never'
               %td
