@@ -56,10 +56,6 @@ class OTPAmbassador
       @trip.trip_time,
       @trip.arrive_by
     )
-
-    Rails.logger.info("Initializing OTPAmbassador with trip_types: #{@trip_types}")
-    Rails.logger.info("Trip type dictionary in use: #{@trip_type_dictionary}")
-    Rails.logger.info("OTP response initialized: #{@otp_response.inspect}")
   end
 
   # Packages and returns any errors that came back with a given trip request
@@ -80,9 +76,7 @@ class OTPAmbassador
   end
 
   def get_itineraries(trip_type)
-    Rails.logger.info("The trip type being passed into the get_itineraries method is: #{trip_type}")
     # Validate response and extract itineraries
-    Rails.logger.info("otp_response: #{@otp_response.inspect}")
     itineraries = @otp_response.dig("data", "plan", "itineraries") || []
     itineraries.map { |i| convert_itinerary(i, trip_type) }.compact
   end
@@ -92,7 +86,6 @@ class OTPAmbassador
   def get_duration(trip_type)
     return 0 if errors(trip_type)
     itineraries = ensure_response(trip_type).itineraries
-    Rails.logger.info("Itineraries for trip type #{trip_type}: #{itineraries.inspect}")
     return itineraries[0]["duration"] if itineraries[0]
     0
   end
@@ -169,7 +162,6 @@ class OTPAmbassador
   def convert_itinerary(otp_itin, trip_type)
     associate_legs_with_services(otp_itin)
   
-    Rails.logger.info("Converting itinerary: #{otp_itin.inspect}")
   
     service_id = otp_itin["legs"].detect { |leg| leg['serviceId'].present? }&.fetch('serviceId', nil)
     start_time = otp_itin["legs"].first["from"]["departureTime"]
@@ -197,12 +189,10 @@ class OTPAmbassador
 
 # Updated associate_legs_with_services method to handle the hash format
 def associate_legs_with_services(otp_itin)
-  Rails.logger.info "Inspecting OTP itinerary structure: #{otp_itin.inspect}"
 
   itineraries = otp_itin['itineraries'] || otp_itin.dig('plan', 'itineraries')
   
   if itineraries.nil?
-    Rails.logger.error("Error: Expected 'itineraries' array missing from otp_itin. Check structure.")
     return
   end
 
@@ -257,11 +247,8 @@ end
   def get_transit_time(otp_itin, trip_type)
     if trip_type == :paratransit
       if otp_itin["duration"]
-        Rails.logger.info("Paratransit trip detected. Using top-level duration: #{otp_itin['duration']}")
-        Rails.logger.info("otp_itin: #{otp_itin.inspect}")
         return otp_itin["duration"]
       else
-        Rails.logger.warn("Paratransit trip missing duration. Defaulting to 0.")
         return 0
       end
     end
@@ -275,7 +262,6 @@ end
     # Process legs if present
     if otp_itin["legs"]
       otp_itin["legs"].each do |leg|
-        Rails.logger.info("Leg mode: #{leg['mode']}")
 
         if transit_modes.include?(leg["mode"])
           # Use startTime and endTime for leg duration
@@ -284,7 +270,6 @@ end
 
           if start_time && end_time
             leg_duration = (end_time - start_time) / 1000 # Convert milliseconds to seconds
-            Rails.logger.info("Transit leg found with duration: #{leg_duration} seconds")
             total_transit_time += leg_duration
           else
             Rails.logger.warn("Missing start or end time for leg: #{leg.inspect}")

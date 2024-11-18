@@ -45,7 +45,6 @@ class TripPlanner
 
   # Constructs Itineraries for the Trip based on the options passed
   def plan
-    Rails.logger.info("Starting plan with trip_types: #{@trip_types}")
 
     # Identify available services and set instance variable for use in building itineraries
     set_available_services
@@ -94,7 +93,6 @@ class TripPlanner
       @available_services = @available_services.by_max_age(@trip.user.age).by_min_age(@trip.user.age)
     end
 
-    Rails.logger.info "Initial available services count: #{@available_services.count}"
 
     # Apply remaining filters if not in travel patterns mode.
     # Services using travel patterns are checked through travel patterns API.
@@ -146,12 +144,9 @@ class TripPlanner
   
   # Builds itineraries for all trip types
   def build_all_itineraries
-    Rails.logger.info("Building itineraries for each trip type: #{@trip_types}")
     trip_itineraries = @trip_types.flat_map do |t| 
-      Rails.logger.info("Calling build_itineraries for trip_type: #{t}")
       build_itineraries(t)
     end
-    Rails.logger.info("Built itineraries for all trip types: #{trip_itineraries.map(&:inspect)}")
     new_itineraries = trip_itineraries.reject(&:persisted?)
     old_itineraries = trip_itineraries.select(&:persisted?)
 
@@ -214,10 +209,8 @@ class TripPlanner
 
   # Calls the requisite trip_type itineraries method
   def build_itineraries(trip_type)
-    Rails.logger.info("Building itineraries for trip_type: #{trip_type}")
     catch_errors(trip_type)
     result = self.send("build_#{trip_type}_itineraries")
-    Rails.logger.info("Finished building #{trip_type} itineraries: #{result}")
     result
   end
   
@@ -261,7 +254,6 @@ class TripPlanner
       # This ensures we respect accomodations and eligibilities
       otp_itineraries = build_fixed_itineraries(:paratransit).select{ |itin|
         itin.service_id.present?
-        Rails.logger.info("Paratransit itinerary: #{itin.inspect}")
       }
       
       # paratransit itineraries can return just transit since we also look for a mixed
@@ -400,9 +392,7 @@ class TripPlanner
 
   # Generic OTP Call
   def build_fixed_itineraries(trip_type)
-    Rails.logger.info("Building fixed itineraries for trip_type: #{trip_type}")
     itineraries = @router.get_itineraries(trip_type)
-    Rails.logger.info("Fetched itineraries for #{trip_type}: #{itineraries}")    
 
     itineraries.map { |i| Itinerary.new(i) }
   end
