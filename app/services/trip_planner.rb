@@ -386,11 +386,14 @@ class TripPlanner
   end
 
   # Generic OTP Call
-  def build_fixed_itineraries trip_type
-    @router.get_itineraries(trip_type).map {|i| Itinerary.new(i)}
+  def build_fixed_itineraries(trip_type)
+    itineraries = @router.get_itineraries(trip_type)
     if trip_type == :paratransit
-      Rails.logger.info("Results from build_fixed_itineraries: #{@router}")
+      Rails.logger.info("Results from build_fixed_itineraries for #{trip_type}: #{itineraries}")
     end
+
+    itineraries.map { |i| Itinerary.new(i) }
   end
+
 
 end
