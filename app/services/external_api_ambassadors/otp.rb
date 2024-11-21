@@ -61,7 +61,13 @@ module OTP
             to: { lat: $toLat, lon: $toLon }
             date: $date
             time: $time
-            transportModes: [{ mode: TRANSIT }, { mode: WALK }]
+            transportModes: [
+              { mode: TRANSIT },
+              { mode: WALK },
+              { mode: FLEX, qualifier: DIRECT },
+              { mode: FLEX, qualifier: ACCESS },
+              { mode: FLEX, qualifier: EGRESS }
+            ]
           ) {
             itineraries {
               startTime
@@ -87,7 +93,7 @@ module OTP
               legs {
                 mode
                 distance
-                route { 
+                route {
                   gtfsId
                   shortName
                   longName
@@ -95,6 +101,10 @@ module OTP
                     gtfsId
                     name
                   }
+                }
+                agency {
+                  id
+                  name
                 }
                 from {
                   name
@@ -125,6 +135,9 @@ module OTP
                       name
                     }
                   }
+                }
+                legGeometry {
+                  points
                 }
               }
             }
