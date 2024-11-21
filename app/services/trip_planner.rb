@@ -45,7 +45,6 @@ class TripPlanner
 
   # Constructs Itineraries for the Trip based on the options passed
   def plan
-
     # Identify available services and set instance variable for use in building itineraries
     set_available_services
     
@@ -93,6 +92,7 @@ class TripPlanner
       @available_services = @available_services.by_max_age(@trip.user.age).by_min_age(@trip.user.age)
     end
 
+    Rails.logger.info "Initial available services count: #{@available_services.count}"
 
     # Apply remaining filters if not in travel patterns mode.
     # Services using travel patterns are checked through travel patterns API.
@@ -144,9 +144,7 @@ class TripPlanner
   
   # Builds itineraries for all trip types
   def build_all_itineraries
-    trip_itineraries = @trip_types.flat_map do |t| 
-      build_itineraries(t)
-    end
+    trip_itineraries = @trip_types.flat_map {|t| build_itineraries(t)}
     new_itineraries = trip_itineraries.reject(&:persisted?)
     old_itineraries = trip_itineraries.select(&:persisted?)
 
@@ -203,17 +201,12 @@ class TripPlanner
 
     @trip.itineraries = itineraries
   end
-  
-  
-  
 
   # Calls the requisite trip_type itineraries method
   def build_itineraries(trip_type)
     catch_errors(trip_type)
-    result = self.send("build_#{trip_type}_itineraries")
-    result
+    self.send("build_#{trip_type}_itineraries")
   end
-  
 
   # Catches errors associated with a trip type and saves them in @errors
   def catch_errors(trip_type)
@@ -391,11 +384,8 @@ class TripPlanner
   end
 
   # Generic OTP Call
-  def build_fixed_itineraries(trip_type)
-    itineraries = @router.get_itineraries(trip_type)
-
-    itineraries.map { |i| Itinerary.new(i) }
+  def build_fixed_itineraries trip_type
+    @router.get_itineraries(trip_type).map {|i| Itinerary.new(i)}
   end
-
 
 end

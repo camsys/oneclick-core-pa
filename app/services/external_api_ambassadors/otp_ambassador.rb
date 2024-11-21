@@ -49,7 +49,7 @@ class OTPAmbassador
     }.compact.uniq
     @otp = OTPService.new(Config.open_trip_planner, otp_version)
 
-    # Prepare the OTP call and store the response for later access
+    # add http calls to bundler based on trip and modes
     @otp_response = @otp.plan(
       [@trip.origin.lat, @trip.origin.lng],
       [@trip.destination.lat, @trip.destination.lng],
@@ -75,12 +75,12 @@ class OTPAmbassador
     return itineraries.map{|i| i.legs.pluck("agencyId")}
   end
 
+  # Returns an array of 1-Click-ready itinerary hashes.
   def get_itineraries(trip_type)
-    # Validate response and extract itineraries
-    itineraries = @otp_response.dig("data", "plan", "itineraries") || []
-    itineraries.map { |i| convert_itinerary(i, trip_type) }.compact
+    return [] if errors(trip_type)
+    itineraries = ensure_response(trip_type).itineraries
+    return itineraries.map {|i| convert_itinerary(i, trip_type)}.compact
   end
-  
 
   # Extracts a trip duration from the OTP response.
   def get_duration(trip_type)
@@ -159,50 +159,39 @@ class OTPAmbassador
     end 
   end
 
+  # Converts an OTP itinerary hash into a set of 1-Click itinerary attributes
   def convert_itinerary(otp_itin, trip_type)
     associate_legs_with_services(otp_itin)
-  
-  
-    service_id = otp_itin["legs"].detect { |leg| leg['serviceId'].present? }&.fetch('serviceId', nil)
-    start_time = otp_itin["legs"].first["from"]["departureTime"]
-    end_time = otp_itin["legs"].last["to"]["arrivalTime"]
-  
-    # Set startTime and endTime in the first and last legs for UI compatibility
-    otp_itin["legs"].first["startTime"] = start_time
-    otp_itin["legs"].last["endTime"] = end_time
-  
-    {
-      start_time: Time.at(start_time.to_i / 1000).in_time_zone,
-      end_time: Time.at(end_time.to_i / 1000).in_time_zone,
+    itin_has_invalid_leg = otp_itin.legs.detect{ |leg| 
+      leg['serviceName'] && leg['serviceId'].nil?
+    }
+    return nil if itin_has_invalid_leg
+
+    service_id = otp_itin.legs
+                          .detect{ |leg| leg['serviceId'].present? }
+                          &.fetch('serviceId', nil)
+
+    return {
+      start_time: Time.at(otp_itin["startTime"].to_i/1000).in_time_zone,
+      end_time: Time.at(otp_itin["endTime"].to_i/1000).in_time_zone,
       transit_time: get_transit_time(otp_itin, trip_type),
       walk_time: get_walk_time(otp_itin, trip_type),
       wait_time: get_wait_time(otp_itin),
       walk_distance: get_walk_distance(otp_itin),
       cost: extract_cost(otp_itin, trip_type),
-      legs: otp_itin["legs"],
+      legs: otp_itin.legs.to_a,
       trip_type: trip_type,
-      service_id: service_id,
+      service_id: service_id
     }
   end
-  
 
-
-# Updated associate_legs_with_services method to handle the hash format
-def associate_legs_with_services(otp_itin)
-
-  itineraries = otp_itin['itineraries'] || otp_itin.dig('plan', 'itineraries')
-  
-  if itineraries.nil?
-    return
-  end
-
-  # Proceed if itineraries are found
-  itineraries.each do |itinerary|
-    itinerary['legs'] ||= []
-
-    itinerary['legs'] = itinerary['legs'].map do |leg|
+  # Modifies OTP Itin's legs, inserting information about 1-Click services
+  def associate_legs_with_services(otp_itin)
+    otp_itin.legs ||= []
+    otp_itin.legs = otp_itin.legs.map do |leg|
       svc = get_associated_service_for(leg)
 
+      # double check if its paratransit but not set to that mode
       if !leg['mode'].include?('FLEX') && leg['boardRule'] == 'mustPhone'
         leg['mode'] = 'FLEX_ACCESS'
       end
@@ -210,29 +199,25 @@ def associate_legs_with_services(otp_itin)
       if svc
         leg['serviceId'] = svc.id
         leg['serviceName'] = svc.name
-        leg['serviceFareInfo'] = svc.url
+        leg['serviceFareInfo'] = svc.url  # Should point to service's fare_info_url, but we don't have that yet
         leg['serviceLogoUrl'] = svc.full_logo_url
-        leg['serviceFullLogoUrl'] = svc.full_logo_url(nil)
+        leg['serviceFullLogoUrl'] = svc.full_logo_url(nil) # actual size
       else
-        leg['serviceName'] = leg['agencyName'] || leg['agencyId']
+        leg['serviceName'] = (leg['agencyName'] || leg['agencyId'])
       end
 
       leg
     end
   end
-end
-
-
-  
   def get_associated_service_for(leg)
     svc = nil
     leg ||= {}
     gtfs_agency_id = leg['agencyId']
     gtfs_agency_name = leg['agencyName']
-
+  
     # If gtfs_agency_id is not nil, first attempt to find the service by its GTFS agency ID.
     svc ||= Service.find_by(gtfs_agency_id: gtfs_agency_id) if gtfs_agency_id
-
+  
     if svc
       # If a service is found by ID, we need to check if it's within the list of permitted services.
       return @services.detect { |s| s.id == svc.id }
@@ -241,9 +226,8 @@ end
       return @services.find_by(name: gtfs_agency_name) if gtfs_agency_name
     end
   end  
-   
 
-  # Calculates the total time spent on transit legs
+  # OTP Lists Car and Walk as having 0 transit time
   def get_transit_time(otp_itin, trip_type)
     if trip_type == :paratransit
       if otp_itin["duration"]
@@ -302,29 +286,18 @@ end
     return otp_itin["walkDistance"]
   end
 
-  def extract_cost(itinerary, trip_type)
-    # Only process fares for relevant trip types (like transit).
-    return 0.0 unless [:transit, :bus, :rail].include?(trip_type)
-  
-    # Try to fetch fare from itinerary-level fares.
-    fare = itinerary["fares"]&.first
-    if fare
-      return fare["cents"] / 100.0
+  # Extracts cost from OTP itinerary
+  def extract_cost(otp_itin, trip_type)
+    # OTP returns a nil cost for walk trips.  nil means unknown, so it should be zero instead
+    case trip_type
+    when [:walk, :bicycle]
+      return 0.0
+    when [:car]
+      return nil
     end
-  
-    # Fallback to fetching fare from leg-level fareProducts.
-    itinerary["legs"].each do |leg|
-      leg["fareProducts"]&.each do |product|
-        if product["product"]["price"]
-          return product["product"]["price"]["amount"]
-        end
-      end
-    end
-  
-    # Default to zero if no fare information is found.
-    0.0
+
+    otp_itin.fare_in_dollars
   end
-  
 
   # Extracts total distance from OTP itinerary
   # default conversion factor is for converting meters to miles
