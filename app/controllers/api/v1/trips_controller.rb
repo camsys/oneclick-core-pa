@@ -583,7 +583,8 @@ module Api
             wait_start: itinerary.booking ? itinerary.booking.earliest_pu : nil,
             pu_window_end: itinerary.booking ? itinerary.booking.latest_pu : nil,
             wait_end: itinerary.booking ? itinerary.booking.latest_pu : nil,
-            estimated_pickup_time: departure ? departure.strftime("%Y-%m-%dT%H:%M") : nil
+            # make pickup time 50 minutes from right now
+            estimated_pickup_time: Time.now + 50.minutes,
           }
         end
         itinerary_hash
