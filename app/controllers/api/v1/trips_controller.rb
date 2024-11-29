@@ -34,8 +34,13 @@ module Api
           end
         end
 
+        Rails.logger.info "Future Trips: #{future_trips_hash.inspect}"
+        Rails.logger.info "Future Trips Count: #{future_trips_hash.count}"
+
         # Remove duplicates based on trip_id, arrival, and departure
         future_trips_hash.uniq! { |trip| [trip[:id], trip[:arrival], trip[:departure]] }
+
+        Rails.logger.info "Future Trips Count after Uniq: #{future_trips_hash.count}"
 
         # Render the response
         render status: 200, json: { trips: future_trips_hash }
