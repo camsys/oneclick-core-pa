@@ -38,8 +38,8 @@ module Api
         Rails.logger.info "Future Trips Count: #{future_trips_hash.count}"
 
         # Remove duplicates based on trip_id, arrival, and departure
-        future_trips_hash.uniq! { |trip| [trip[:id], trip[:arrival], trip[:departure], trip[:origin_id], trip[:destination_id]] }
-
+        future_trips_hash = future_trips_hash.uniq { |trip| [trip[:trip_id], trip[:arrival], trip[:departure]] }
+        
         Rails.logger.info "Future Trips Count after Uniq: #{future_trips_hash.count}"
 
         # Render the response
