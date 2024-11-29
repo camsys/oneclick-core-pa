@@ -154,11 +154,26 @@ class User < ApplicationRecord
   end
 
   # Returns the user's (count) future trips, in descending order of trip time
-  def future_trips(count=nil)
+  def future_trips(count = nil)
     # Sync up with any booking services
-    sync 
-    trips.selected.future.limit(count)
-  end
+    sync
+    
+    trips.selected.future.limit(count).flat_map do |trip|
+      trip.itineraries.map do |itinerary|
+        {
+          trip_id: trip.id,
+          itinerary_id: itinerary.id,
+          user_id: trip.user_id,
+          mode: itinerary.trip_type,
+          from_place: trip.origin&.name || trip.origin&.formatted_address,
+          to_place: trip.destination&.name || trip.destination&.formatted_address,
+          start_time: itinerary.start_time,
+          end_time: itinerary.end_time,
+          details: itinerary.details
+        }
+      end
+    end
+  end  
 
   # Returns an unordered collection of the traveler's waypoints
   def waypoints
