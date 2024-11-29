@@ -22,7 +22,7 @@ module Api
         future_trips_with_booking = @traveler.future_trips(params[:max_results] || 25).select do |trip|
           trip.booking.present? && trip.booking.confirmation.present?
         end
-      
+
         # Split trips with multiple itineraries into separate virtual trips
         future_trips_hash = future_trips_with_booking.flat_map do |trip|
           if trip.itineraries.size > 1
@@ -33,7 +33,11 @@ module Api
             [filter_trip_name(trip)] # Keep the trip as-is if only one itinerary
           end
         end
-      
+
+        # Remove duplicates based on trip_id, arrival, and departure
+        future_trips_hash.uniq! { |trip| [trip[:id], trip[:arrival], trip[:departure]] }
+
+        # Render the response
         render status: 200, json: { trips: future_trips_hash }
       end
             
