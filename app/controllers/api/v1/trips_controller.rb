@@ -22,50 +22,22 @@ module Api
         future_trips_with_booking = @traveler.future_trips(params[:max_results] || 25).select do |trip|
           trip.booking.present? && trip.booking.confirmation.present?
         end
-
-        # Split trips with multiple itineraries into separate virtual trips
-        future_trips_hash = future_trips_with_booking.flat_map do |trip|
-          if trip.itineraries.size > 1
-            trip.itineraries.map do |itinerary|
-              create_virtual_trip(trip, itinerary)
+      
+        # Map the trips to the filtered hash format
+        future_trips_hash = future_trips_with_booking.map { |t| filter_trip_name(t) }
+      
+        # Further split trips that have multiple itineraries
+        split_trips_hash = future_trips_hash.flat_map do |trip|
+          if trip[:itineraries]&.size.to_i > 1
+            trip[:itineraries].map do |itinerary|
+              trip.merge(itinerary: itinerary) # Assign one itinerary per trip
             end
           else
-            [filter_trip_name(trip)] # Keep the trip as-is if only one itinerary
+            trip
           end
         end
-
-        Rails.logger.info "Future Trips: #{future_trips_hash.inspect}"
-        Rails.logger.info "Future Trips Count: #{future_trips_hash.count}"
-
-        # Remove duplicates based on trip_id, arrival, and departure
-        future_trips_hash = future_trips_hash.uniq { |trip| [trip[:trip_id], trip[:pu_window_start]] }
-        
-        Rails.logger.info "Future Trips Count after Uniq: #{future_trips_hash.count}"
-
-        # Render the response
-        render status: 200, json: { trips: future_trips_hash }
-      end
-            
-      # Creates a virtual trip with one itinerary for splitting purposes
-      def create_virtual_trip(trip, itinerary)
-        {
-          id: "#{trip.id}_#{itinerary.id}", # Generate a unique ID for the virtual trip
-          user_id: trip.user_id,
-          origin_id: trip.origin_id,
-          destination_id: trip.destination_id,
-          trip_time: trip.trip_time,
-          itineraries: [itinerary], # Include only the current itinerary
-          arrive_by: trip.arrive_by,
-          selected_itinerary_id: itinerary.id,
-          purpose_id: trip.purpose_id,
-          previous_trip_id: trip.previous_trip_id,
-          external_purpose: trip.external_purpose,
-          details: trip.details,
-          disposition_status: trip.disposition_status,
-          user_age: trip.user_age,
-          user_ip: trip.user_ip,
-          note: trip.note
-        }
+      
+        render status: 200, json: { trips: split_trips_hash }
       end      
 
       # POST trips/, POST itineraries/plan
