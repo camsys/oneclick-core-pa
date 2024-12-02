@@ -22,9 +22,18 @@ module Api
         future_trips_with_booking = @traveler.future_trips(params[:max_results] || 25).select do |trip|
           trip.booking.present? && trip.booking.confirmation.present?
         end
-
+      
+        # Remove additional itineraries for each trip, keeping only the first ("0")
+        future_trips_with_booking.each do |trip|
+          trip.keys.each do |key|
+            trip.delete(key) unless key == "0"
+          end
+        end
+      
+        # Generate the future trips hash
         future_trips_hash = future_trips_with_booking.map { |t| filter_trip_name(t) }
-        render status: 200, json: {trips: future_trips_hash}
+      
+        render status: 200, json: { trips: future_trips_hash }
       end
 
       # POST trips/, POST itineraries/plan
