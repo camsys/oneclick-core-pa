@@ -24,14 +24,16 @@ module Api
         end
       
         # Remove additional itineraries for each trip, keeping only the first ("0")
-        future_trips_with_booking.each do |trip|
-          trip.keys.each do |key|
-            trip.delete(key) unless key == "0"
+        filtered_trips = future_trips_with_booking.map do |trip|
+          trip_hash = trip.as_json # Convert the trip object to a hash
+          trip_hash.each_key do |key|
+            trip_hash.delete(key) unless key == "0" # Keep only "0" itinerary
           end
+          trip_hash
         end
       
         # Generate the future trips hash
-        future_trips_hash = future_trips_with_booking.map { |t| filter_trip_name(t) }
+        future_trips_hash = filtered_trips.map { |t| filter_trip_name(t) }
       
         render status: 200, json: { trips: future_trips_hash }
       end
