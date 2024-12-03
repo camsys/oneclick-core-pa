@@ -1119,19 +1119,23 @@ class EcolaneAmbassador < BookingAmbassador
     best_index = nil
     # Now Narrow it down based on sponsor
     potential_options.each do |option|
-      if best_index == nil and option["sponsor"].in? @preferred_sponsors
+        if best_index.nil? && option["sponsor"].in?(@preferred_sponsors)
         best_index = @preferred_sponsors.index(option["sponsor"])
-        best_option = option 
-      elsif option["sponsor"].in? @preferred_sponsors and @preferred_sponsors.index(option["sponsor"]) < best_index
+        best_option = option
+      elsif option["sponsor"].in?(@preferred_sponsors) && @preferred_sponsors.index(option["sponsor"]) < best_index
         best_index = @preferred_sponsors.index(option["sponsor"])
         best_option = option
       end
     end
 
-    if potential_options.blank?
-      {}
-    else
+    if best_option.nil?
+      best_option = potential_options.first
+    end
+
+    if best_option
       {funding_source: best_option["funding_source"], purpose: @purpose, sponsor: best_option["sponsor"]}
+    else
+      {}
     end
 
   end
