@@ -140,8 +140,6 @@ class EcolaneAmbassador < BookingAmbassador
       occ_trip_from_ecolane_trip(order)
     end
   
-    # For trips that are round trips, make sure that they point to each other.
-    link_trips
   end
   
 
