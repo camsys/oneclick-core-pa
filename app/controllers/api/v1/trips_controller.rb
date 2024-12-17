@@ -10,18 +10,21 @@ module Api
       # Returns past trips associated with logged in user, limit by max_results param
       def past_trips
         past_trips_with_booking = @traveler.past_trips(params[:max_results] || 25).select do |trip|
+          Rails.logger.info "Trip ID: #{trip.id}, Next Trip ID: #{trip.next_trip&.id}"
           trip.booking.present? && trip.booking.confirmation.present?
         end
-
+      
         trip_ids = {}
         past_trips_hash = past_trips_with_booking.map do |trip|
           trips_array = []
           unless trip_ids[trip.id]
+            Rails.logger.info "Adding Trip ID: #{trip.id}"
             trips_array << filter_trip_name(trip)
             trip_ids[trip.id] = true
           end
       
           if trip.next_trip.present? && trip.next_trip.origin.present? && !trip_ids[trip.next_trip.id]
+            Rails.logger.info "Adding Next Trip ID: #{trip.next_trip.id}"
             trips_array << filter_trip_name(trip.next_trip)
             trip_ids[trip.next_trip.id] = true
           end
@@ -32,7 +35,7 @@ module Api
         past_trips_hash.flatten!
       
         render status: 200, json: { trips: past_trips_hash }
-      end
+      end      
             
 
       # GET trips/future_trips
