@@ -156,10 +156,20 @@
 
       // Click handlers for adding new schedules
       $('.add-day-schedule').click(function() {
-        console.log("Add hours button clicked");
-        var day = $(this).siblings('.sub-schedule-container').data("day");
-        console.log("Day selected for schedule:", day);
-        weeklySch.addSchedule(day).trigger('change');
+          console.log("Add hours button clicked");
+
+          // Determine which helper to use based on the container
+          var parentContainer = $(this).closest('.form-inline');
+          if (parentContainer.hasClass('schedule-week-container')) {
+              var day = $(this).siblings('.sub-schedule-container').data('day');
+              console.log("Day selected for weekly schedule:", day);
+              weeklySch.addSchedule(day).trigger('change');
+          } else if (parentContainer.hasClass('schedule-calendar-times-container')) {
+              console.log("Adding schedule for calendar times");
+              calendarTimeSch.addSchedule(null).trigger('change');
+          } else {
+              console.warn("Unhandled container type for Add Hours button");
+          }
       });
       $('.add-calendar-date-schedule').click(function() {
         console.log("Add calendar date button clicked");
