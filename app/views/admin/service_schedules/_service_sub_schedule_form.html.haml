@@ -97,75 +97,74 @@
 -# Script nested under form so it can reference it in ScheduleHelper call
 :javascript
   $(document).ready(function() {
-      console.log("Document ready: Initializing form handler and schedule helpers");
 
+    // Initialize day data for .sub-schedule-container elements
+      $(".schedule-week-container .sub-schedule-container").each(function(index) {
+          if (!$(this).data("day")) {
+              console.log("Initializing day data for sub-schedule-container at index:", index);
+              $(this).data("day", index);
+          }
+      });
+      
       var fh = new FormHandler($('#{form_id}'));
-      console.log("FormHandler initialized:", fh);
-
       var weeklySch = new ScheduleHelper(
         '#{weekly_schedules_json}',
         $('.schedule-week-container'),
         '#{escape_javascript render partial: "admin/service_schedules/weekly_service_sub_schedule", locals: {f: f, service_sub_schedules: weekly_sub_schedules, can_update: true}}'
       );
-      console.log("Weekly ScheduleHelper initialized:", weeklySch);
 
       var calendarDateSch = new ScheduleHelper(
         '#{calendar_date_schedules_json}',
         $('.schedule-calendar-dates-container'),
         '#{escape_javascript render partial: "admin/service_schedules/calendar_dates_service_sub_schedule", locals: {f: f, calendar_dates: calendar_date_sub_schedules, can_update: true}}'
       );
-      console.log("Calendar Date ScheduleHelper initialized:", calendarDateSch);
 
       var calendarTimeSch = new ScheduleHelper(
         '#{calendar_time_schedules_json}',
         $('.schedule-calendar-times-container'),
         '#{escape_javascript render partial: "admin/service_schedules/calendar_times_service_sub_schedule", locals: {f: f, calendar_times: calendar_time_sub_schedules, can_update: true}}'
       );
-      console.log("Calendar Time ScheduleHelper initialized:", calendarTimeSch);
 
-      // Have the FormHandler watch the schedules for changes
+      // Have the FormHandler watch the schedules for changes, plus trigger change event for the new schedule
       fh.watch($('.form-container'));
-      console.log("FormHandler watching form-container for changes");
 
       // Reset the schedule divs on form reset
       fh.onReset(function() {
-        console.log("Form reset triggered");
         if ('#{schedule_type&.id}' == '#{ServiceScheduleType.weekly_schedule.id}') {
-          console.log("Resetting weekly schedule type");
           weeklySch.reset();
           calendarDateSch._clear();
           calendarTimeSch._clear();
+          $(".form-inline[data-schedule-type != '#{schedule_type&.id}']").hide();
+          $(".form-inline[data-schedule-type = '#{schedule_type&.id}']").show();
         }
         if ('#{schedule_type&.id}' == '#{ServiceScheduleType.calendar_date_schedule.id}') {
-          console.log("Resetting calendar date schedule type");
           calendarDateSch.reset();
           calendarTimeSch.reset();
           weeklySch._clear();
+          $(".form-inline[data-schedule-type != '#{schedule_type&.id}']").hide();
+          $(".form-inline[data-schedule-type = '#{schedule_type&.id}']").show();
         }
-        $(".form-inline[data-schedule-type != '#{schedule_type&.id}']").hide();
-        $(".form-inline[data-schedule-type = '#{schedule_type&.id}']").show();
+        else {
+          weeklySch.reset();
+          calendarDateSch.reset();
+          calendarTimeSch.reset();
+        }
       });
 
-      // Click handlers for adding new schedules
+      // Click handler for adding new schedules
       $('.add-day-schedule').click(function() {
-        console.log("Add hours button clicked");
         var day = $(this).siblings('.sub-schedule-container').data().day;
-        console.log("Day selected for schedule:", day);
         weeklySch.addSchedule(day).trigger('change');
       });
       $('.add-calendar-date-schedule').click(function() {
-        console.log("Add calendar date button clicked");
         calendarDateSch.addSchedule(null).trigger('change');
       });
       $('.add-calendar-time-schedule').click(function() {
-        console.log("Add calendar time button clicked");
         calendarTimeSch.addSchedule(null).trigger('change');
       });
 
-      // Handle changes in schedule type
       $("#service_schedule_service_schedule_type_id").on("change", function() {
-        var schedule_type = $(this).val();
-        console.log("Schedule type changed:", schedule_type);
+        schedule_type = $(this).val();
         weeklySch._clear();
         calendarDateSch._clear();
         calendarTimeSch._clear();
@@ -174,27 +173,19 @@
         $(".form-inline[data-schedule-type = '" + schedule_type + "']").show();
       });
 
-      // Initial visibility based on schedule type
-      var initialScheduleType = $("#service_schedule_service_schedule_type_id").val();
-      console.log("Initial schedule type:", initialScheduleType);
-      $(".form-inline[data-schedule-type = '" + initialScheduleType + "']").show();
-      $(".form-inline[data-schedule-type != '" + initialScheduleType + "']").hide();
+      $(".form-inline[data-schedule-type = '" + $("#service_schedule_service_schedule_type_id").val() + "']").show();
+      $(".form-inline[data-schedule-type != '" + $("#service_schedule_service_schedule_type_id").val() + "']").hide();
 
-      // Check and hide empty time schedules
       $(".start-time").closest(".schedule-body").each(function() {
         if ($(this).find(".start-time").val() == "" && $(this).find(".end-time").val() == "") {
-          console.log("Hiding empty time schedule");
           $(this).hide();
         }
       });
 
-      // Form validation on submit
       fh.form.on("submit", function(e) {
-        console.log("Form submit triggered");
         let formValid = true;
 
         if ($(".calendar-date:visible").length == 0) {
-          console.log("Validation failed: No visible calendar date");
           e.preventDefault();
           alert("Service schedule must contain at least one calendar date.");
           formValid = false;
@@ -202,28 +193,27 @@
 
         $(".sub-schedule-container .calendar-date:visible, .sub-schedule-container select:visible").each(function() {
           if ($(this).val() == "") {
-            console.log("Validation failed: Blank field found");
             e.preventDefault();
             $(this)[0].setCustomValidity("Field cannot be blank.");
             $(this)[0].reportValidity();
             formValid = false;
             return false;
-          } else {
+          }
+          else {
             $(this)[0].setCustomValidity("");
             formValid = true;
           }
         });
-
         if (formValid) {
           $(".start-time:visible").each(function() {
             if ($(this).val() > $(this).closest(".schedule-body").find(".end-time").val()) {
-              console.log("Validation failed: Start time after end time");
               e.preventDefault();
               $(this)[0].setCustomValidity("Start time cannot be after end time.");
               $(this)[0].reportValidity();
               formValid = false;
               return false;
-            } else {
+            }
+            else {
               $(this)[0].setCustomValidity("");
             }
           });
@@ -231,9 +221,8 @@
       });
 
       $("input:visible, select:visible").on("change", function() {
-        console.log("Input or select field changed:", $(this).attr("name"), "Value:", $(this).val());
         $(this)[0].setCustomValidity("");
-      });
+      })
   });
 
 
