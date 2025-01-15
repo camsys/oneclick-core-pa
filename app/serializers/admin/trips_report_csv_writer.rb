@@ -89,11 +89,11 @@ module Admin
     end
 
     def agency_name
-      booking_snapshot&.agency_name rescue 'No Agency'
+      booking_snapshot&.agency_name || @record.user.booking_profile.service.agency.name rescue 'No Agency'
     end
 
     def service_name
-      booking_snapshot&.service_name rescue 'No Service'
+      booking_snapshot&.service_name || @record.user.booking_profile.service.name rescue 'No Service'
     end
 
     def booking_id
