@@ -1,6 +1,6 @@
 class Admin::ReportsController < Admin::AdminController
   
-  DOWNLOAD_TABLES = ['Trips', 'Users', 'Services', 'Requests', 'Feedback', 'Feedback Aggregated', 'Find Services']
+  DOWNLOAD_TABLES = ['Trips', 'Users', 'Feedback', 'Feedback Aggregated', 'Find Services']
   DASHBOARDS = ['Planned Trips', 'Unique Users', 'Popular Destinations']
   GROUPINGS = [:hour, :day, :week, :month, :quarter, :year, :day_of_week, :month_of_year]
   
