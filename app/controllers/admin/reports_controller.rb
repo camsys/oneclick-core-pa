@@ -115,10 +115,10 @@ class Admin::ReportsController < Admin::AdminController
       :origin,
       :destination,
       :ecolane_booking_snapshot,
-      :booking => :details,
+      :booking,
       :user => { :booking_profile => { :service => :agency } }
     )
-      
+
     # Apply date filters
     @trips = @trips.where(trip_time: @trip_time_from_date..@trip_time_to_date)
   
