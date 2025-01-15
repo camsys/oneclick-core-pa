@@ -116,7 +116,7 @@ class Admin::ReportsController < Admin::AdminController
       :destination,
       :ecolane_booking_snapshot,
       :booking,
-      :user => { :booking_profile => { :service => :agency } }
+      :user => { :user_booking_profiles => { :service => :agency } }
     )
 
     # Apply date filters
