@@ -111,8 +111,14 @@ class Admin::ReportsController < Admin::AdminController
   
   def trips_table
     # Get trips for the current user's agency and role
-    @trips = current_user.get_trips_for_staff_user
-  
+    @trips = current_user.get_trips_for_staff_user.includes(
+      :origin,
+      :destination,
+      :ecolane_booking_snapshot,
+      :booking => :details,
+      :user => { :booking_profile => { :service => :agency } }
+    )
+      
     # Apply date filters
     @trips = @trips.where(trip_time: @trip_time_from_date..@trip_time_to_date)
   
