@@ -18,8 +18,8 @@ module Admin
     end
     
     def trips_planned
-      @record.trips.count
-    end
+      @record.trips.joins(:ecolane_booking_snapshot).distinct.count
+    end    
     
     def language
       @record.preferred_locale && @record.preferred_locale.name
