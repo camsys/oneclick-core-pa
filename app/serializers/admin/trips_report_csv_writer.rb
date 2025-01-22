@@ -47,23 +47,15 @@ module Admin
     end
 
     def purpose
-      if @record.ecolane_booking_snapshot&.purpose
-        @record.ecolane_booking_snapshot.purpose
-      elsif @record.external_purpose
-        @record.external_purpose
-      elsif @record.purpose
-        @record.purpose.code
-      else
-        "N/A"
-      end
+      booking_snapshot&.purpose || @record.external_purpose || @record.purpose&.code || "N/A"
     end
 
     def trip_time
-      booking_snapshot&.negotiated_pu || @record.trip_time&.in_time_zone
+      booking_snapshot&.negotiated_pu || 'No Trip Time'
     end
 
     def traveler
-      booking_snapshot&.traveler || @record.user&.email
+      booking_snapshot&.traveler || 'No Traveler'
     end
 
     def user_type
@@ -72,7 +64,7 @@ module Admin
         # NOTE: the below translations are 211 Ride specific and have values that are not the same
         # as the fallback value, nor are they values that you'd generally expect
       elsif @record.user&.guest? == true
-        I18n.t('admin.reporting.guest') ||'Guest'
+        I18n.t('admin.reporting.guest') || 'Guest'
       elsif @record.user&.registered_traveler?
         I18n.t('admin.reporting.public_user') || 'Public User'
       else
@@ -81,59 +73,51 @@ module Admin
     end
 
     def traveler_county
-      @record.user&.county
+      @record.user&.county || 'No County'
     end
 
     def traveler_paratransit_id
-      @record.user&.paratransit_id
+      @record.user&.paratransit_id || 'No Paratransit ID'
     end
 
     def agency_name
-      booking_snapshot&.agency_name || @record.user.booking_profile.service.agency.name rescue 'No Agency'
+      booking_snapshot&.agency_name || 'No Agency'
     end
 
     def service_name
-      booking_snapshot&.service_name || @record.user.booking_profile.service.name rescue 'No Service'
+      booking_snapshot&.service_name || 'No Service'
     end
 
     def booking_id
-      booking_snapshot&.confirmation || @record.booking&.confirmation || 'No Booking ID'
+      booking_snapshot&.confirmation || 'No Booking ID'
     end
 
     def booking_client_id
-      if booking_snapshot&.booking_client_id
-        booking_snapshot.booking_client_id
-      elsif @record.booking&.details&.dig(:client_id)
-        @record.booking.details.dig(:client_id)
-      elsif @record.user&.booking_profile&.external_user_id
-        @record.user.booking_profile.external_user_id
-      else
-        'No Booking Client ID'
-      end
+      booking_snapshot&.booking_client_id || @record.booking&.details&.dig(:client_id) || @record.user&.booking_profile&.external_user_id || 'No Booking Client ID'
     end    
 
     def booking_timestamp
-      booking_snapshot&.created_at&.strftime("%Y-%m-%d %H:%M:%S") || @record.booking&.created_at&.strftime("%Y-%m-%d %H:%M:%S") || 'No Booking Timestamp'
+      booking_snapshot&.created_at&.strftime("%Y-%m-%d %H:%M:%S") || 'No Booking Timestamp'
     end
 
     def funding_source
-      booking_snapshot&.funding_source || @record.booking&.details&.dig(:funding_hash, :funding_source) || 'No Funding Source'
+      booking_snapshot&.funding_source || 'No Funding Source'
     end
 
     def sponsor
-      booking_snapshot&.sponsor || @record.booking&.details&.dig(:funding_hash, :sponsor) || 'No Sponsor'
+      booking_snapshot&.sponsor || 'No Sponsor'
     end
 
     def companions
-      booking_snapshot&.companions || @record.booking&.itinerary&.companions || '0'
+      booking_snapshot&.companions || '0'
     end
 
     def trip_note
-      booking_snapshot&.note || @record.booking&.itinerary&.note || ' '
+      booking_snapshot&.note || ' '
     end
 
     def ecolane_error_message
-      booking_snapshot&.ecolane_error_message || @record.selected_itinerary&.booking&.ecolane_error_message || 'N/A'
+      booking_snapshot&.ecolane_error_message || 'N/A'
     end
 
     def pca
@@ -150,55 +134,54 @@ module Admin
       else
         return actual_status || initial_status || 'Unknown Disposition'
       end
-
     end
 
     def orig_addr
-      booking_snapshot&.orig_addr || @record.origin&.formatted_address
+      booking_snapshot&.orig_addr || 'No Origin Address'
     end
 
     def orig_county
-      @record.origin&.county
+      @record.origin&.county || 'No Origin County'
     end
 
     def orig_lat
-      booking_snapshot&.orig_lat || @record.origin&.lat
+      booking_snapshot&.orig_lat || 'No Origin Latitude'
     end
 
     def orig_lng
-      booking_snapshot&.orig_lng || @record.origin&.lng
+      booking_snapshot&.orig_lng || 'No Origin Longitude'
     end
 
     def dest_addr
-      booking_snapshot&.dest_addr || @record.destination&.formatted_address
+      booking_snapshot&.dest_addr || 'No Destination Address'
     end
 
     def dest_county
-      @record.destination&.county
+      @record.destination&.county || 'No Destination County'
     end
 
     def dest_lat
-      booking_snapshot&.dest_lat || @record.destination&.lat
+      booking_snapshot&.dest_lat || 'No Destination Latitude'
     end
 
     def dest_lng
-      booking_snapshot&.dest_lng || @record.destination&.lng
+      booking_snapshot&.dest_lng || 'No Destination Longitude'
     end
 
     def traveler_age
-      @record.user_age
+      @record.user_age || 'No Age'
     end
 
     def traveler_ip
-      @record.user_ip
+      @record.user_ip || 'No IP'
     end
 
     def traveler_accommodations
-      @record.trip_accommodations.reduce('') { |string, acc_hash| "#{string}#{acc_hash&.accommodation&.code}; " }
+      @record.trip_accommodations.reduce('') { |string, acc_hash| "#{string}#{acc_hash&.accommodation&.code}; " } || 'No Accommodations'
     end
 
     def traveler_eligibilities
-      @record.trip_eligibilities.reduce('') { |string, elg_hash| "#{string}#{elg_hash&.eligibility&.code}; " }
+      @record.trip_eligibilities.reduce('') { |string, elg_hash| "#{string}#{elg_hash&.eligibility&.code}; " } || 'No Eligibilities'
     end
 
     def is_round_trip
