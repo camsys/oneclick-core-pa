@@ -51,11 +51,11 @@ module Admin
     end
 
     def trip_time
-      booking_snapshot&.negotiated_pu || 'No Trip Time'
+      booking_snapshot&.negotiated_pu || @record.trip_time&.in_time_zone || 'No Trip Time'
     end
 
     def traveler
-      booking_snapshot&.traveler || 'No Traveler'
+      booking_snapshot&.traveler || @record.user&.email || 'No Traveler'
     end
 
     def user_type
