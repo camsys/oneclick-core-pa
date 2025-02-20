@@ -141,7 +141,7 @@ class Admin::ReportsController < Admin::AdminController
       @trips = @trips.where(id: matching_trip_ids)
     end    
 
-    @trips = @trips.order(:trip_time)
+    @trips = @trips.distinct(:booking_id).order(:trip_time)
     respond_to do |format|
       format.csv { send_data @trips.to_csv(limit: CSVWriter::DEFAULT_RECORD_LIMIT, in_travel_patterns_mode: in_travel_patterns_mode?) }
     end
