@@ -47,15 +47,15 @@ module Admin
     end
 
     def purpose
-      booking_snapshot&.purpose || @record.external_purpose || @record.purpose&.code || "N/A"
+      booking_snapshot&.purpose || "N/A"
     end
 
     def trip_time
-      booking_snapshot&.negotiated_pu || @record.trip_time&.in_time_zone || 'No Trip Time'
+      booking_snapshot&.negotiated_pu || 'No Trip Time'
     end
 
     def traveler
-      booking_snapshot&.traveler || @record.user&.email || 'No Traveler'
+      booking_snapshot&.traveler || 'No Traveler'
     end
 
     def user_type
@@ -93,7 +93,7 @@ module Admin
     end
 
     def booking_client_id
-      booking_snapshot&.booking_client_id || @record.booking&.details&.dig(:client_id) || @record.user&.booking_profile&.external_user_id || 'No Booking Client ID'
+      booking_snapshot&.booking_client_id || 'No Booking Client ID'
     end    
 
     def booking_timestamp
@@ -121,7 +121,7 @@ module Admin
     end
 
     def pca
-      booking_snapshot&.pca || (@record.selected_itinerary&.assistant ? 'TRUE' : 'FALSE')
+      booking_snapshot&.pca || 'N/A'
     end
 
     def disposition_status
