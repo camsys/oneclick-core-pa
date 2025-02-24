@@ -1,19 +1,12 @@
 module Admin
   class BookingSnapshotsReportCSVWriter < CSVWriter
-    columns :trip_id, :disposition_status, :negotiated_pu, :traveler, :purpose, :orig_addr, :orig_lat, :orig_lng,
-            :dest_addr, :dest_lat, :dest_lng, :agency_name, :service_name, :booking_id,
-            :booking_client_id, :is_round_trip, :created_at, :funding_source, :sponsor, :companions,
-            :note, :ecolane_error_message, :pca
+    columns :trip_time, :traveler, :disposition_status, :purpose,
+            :orig_lat, :orig_lng, :dest_lat, :dest_lng, :agency_name, :service_name,
+            :booking_id, :booking_client_id, :is_round_trip, :booking_timestamp,
+            :ecolane_error_message, :funding_source, :sponsor, :companions, :trip_note,
+            :pca, :orig_addr, :dest_addr
 
-    def trip_id
-      @record.trip_id
-    end
-
-    def disposition_status
-      @record.disposition_status || 'Unknown Disposition'
-    end
-
-    def negotiated_pu
+    def trip_time
       @record.negotiated_pu || 'No Trip Time'
     end
 
@@ -21,12 +14,12 @@ module Admin
       @record.traveler || 'No Traveler'
     end
 
-    def purpose
-      @record.purpose || 'N/A'
+    def disposition_status
+      @record.disposition_status || 'Unknown Disposition'
     end
 
-    def orig_addr
-      @record.orig_addr || 'No Origin Address'
+    def purpose
+      @record.purpose || 'N/A'
     end
 
     def orig_lat
@@ -35,10 +28,6 @@ module Admin
 
     def orig_lng
       @record.orig_lng || 'No Origin Longitude'
-    end
-
-    def dest_addr
-      @record.dest_addr || 'No Destination Address'
     end
 
     def dest_lat
@@ -69,8 +58,13 @@ module Admin
       @record.is_round_trip ? 'TRUE' : 'FALSE'
     end
 
-    def created_at
+    def booking_timestamp
+      # Use the snapshot's created_at as the booking timestamp.
       @record.created_at.strftime("%Y-%m-%d %H:%M:%S")
+    end
+
+    def ecolane_error_message
+      @record.ecolane_error_message || 'N/A'
     end
 
     def funding_source
@@ -85,16 +79,20 @@ module Admin
       @record.companions || '0'
     end
 
-    def note
+    def trip_note
       @record.note || ' '
-    end
-
-    def ecolane_error_message
-      @record.ecolane_error_message || 'N/A'
     end
 
     def pca
       @record.pca ? 'TRUE' : 'FALSE'
+    end
+
+    def orig_addr
+      @record.orig_addr || 'No Origin Address'
+    end
+
+    def dest_addr
+      @record.dest_addr || 'No Destination Address'
     end
   end
 end
