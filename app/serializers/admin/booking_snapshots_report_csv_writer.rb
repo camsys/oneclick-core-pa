@@ -1,12 +1,16 @@
 module Admin
   class BookingSnapshotsReportCSVWriter < CSVWriter
-    columns :trip_id, :negotiated_pu, :traveler, :purpose, :orig_addr, :orig_lat, :orig_lng,
+    columns :trip_id, :disposition_status, :negotiated_pu, :traveler, :purpose, :orig_addr, :orig_lat, :orig_lng,
             :dest_addr, :dest_lat, :dest_lng, :agency_name, :service_name, :booking_id,
             :booking_client_id, :is_round_trip, :created_at, :funding_source, :sponsor, :companions,
             :note, :ecolane_error_message, :pca
 
     def trip_id
       @record.trip_id
+    end
+
+    def disposition_status
+      @record.disposition_status || 'Unknown Disposition'
     end
 
     def negotiated_pu

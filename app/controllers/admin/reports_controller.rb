@@ -133,7 +133,7 @@ class Admin::ReportsController < Admin::AdminController
     respond_to do |format|
       format.csv { send_data @snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
     end    
-  end
+  end  
   
 
   def in_travel_patterns_mode?
