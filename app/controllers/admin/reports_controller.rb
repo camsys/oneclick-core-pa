@@ -131,8 +131,8 @@ class Admin::ReportsController < Admin::AdminController
     @snapshots = @snapshots.order("negotiated_pu")
     
     respond_to do |format|
-      format.csv { send_data @snapshots.to_csv(writer: Admin::BookingSnapshotsReportCSVWriter) }
-    end
+      format.csv { send_data @snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
+    end    
   end
   
 
