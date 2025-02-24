@@ -1,6 +1,7 @@
 # Helper class for uploading a KML file and reading it.
 class KMLUploader
   require 'geospatial/kml/reader'
+  require 'nokogiri'
 
   attr_reader :errors, :custom_geo, :warnings
 
@@ -46,9 +47,69 @@ class KMLUploader
     begin
       reader = Geospatial::KML::Reader.load_file(@path)
       polygon_count = reader.polygons.count rescue 0
-      linestring_count = reader.respond_to?(:linestrings) ? reader.linestrings.count : 0
+      linestring_count = (reader.respond_to?(:linestrings) ? reader.linestrings.count : 0)
       Rails.logger.info "Total polygons found in KML: #{polygon_count}, total linestrings found: #{linestring_count}"
       
+      # Fallback: if no features found via the gem, use Nokogiri parsing.
+      if polygon_count == 0 && linestring_count == 0
+        Rails.logger.info "No features found via Geospatial::KML::Reader; falling back to Nokogiri parsing..."
+        file_content = File.read(@path)
+        doc = Nokogiri::XML(file_content)
+        ns = {"kml" => "http://www.opengis.net/kml/2.2"}
+        lines = doc.xpath("//kml:LineString", ns)
+        Rails.logger.info "Nokogiri found #{lines.count} LineString element(s)."
+        if lines.count > 0
+          coords_node = lines.first.xpath(".//kml:coordinates", ns).first
+          if coords_node
+            coords_text = coords_node.text.strip
+            Rails.logger.info "Coordinates text (first 100 chars): #{coords_text[0..100]}..."
+            coords_arr = coords_text.split(/\s+/).map { |s| s.split(',').map(&:to_f) }
+            Rails.logger.info "Parsed #{coords_arr.size} coordinate point(s)."
+            # Ensure the linestring is closed
+            if coords_arr.first != coords_arr.last
+              Rails.logger.info "LineString is not closed. Closing it automatically."
+              coords_arr << coords_arr.first
+            end
+            points_wkt = coords_arr.map { |pt| "#{pt[0]} #{pt[1]}" }.join(", ")
+            polygon_wkt = "POLYGON((#{points_wkt}))"
+            Rails.logger.info "Constructed WKT from Nokogiri parsing (first 100 chars): #{polygon_wkt[0..100]}..."
+            factory = RGeo::ActiveRecord::SpatialFactoryStore.instance.default
+            polygon_geom = factory.parse_wkt(polygon_wkt)
+            output_geom = factory.multi_polygon([]).union(polygon_geom)
+            geom = RGeo::Feature.cast(output_geom, RGeo::Feature::MultiPolygon)
+            Rails.logger.info "Parsed geometry: #{geom.as_text}" if geom.respond_to?(:as_text)
+            record = ActiveRecord::Base.logger.silence do
+              Rails.logger.info "Creating record for CustomGeography with name: #{@name}, agency: #{@agency.try(:id)}"
+              @custom_geo = @model.create({ name: @name, agency: @agency })
+              Rails.logger.info "Record after create: #{@custom_geo.inspect}"
+              @custom_geo.update_attributes(geom: geom)
+              Rails.logger.info "Record after updating geom: #{@custom_geo.inspect}"
+              if @custom_geo.errors.present?
+                Rails.logger.error "Encountered errors: #{@custom_geo.errors.full_messages.to_sentence}"
+                @errors << "#{@custom_geo.errors.full_messages.to_sentence} for #{@custom_geo.name}."
+              else
+                @custom_geo
+              end
+            end
+            if record
+              Rails.logger.info "SUCCESS! Record created successfully via Nokogiri fallback."
+            else
+              Rails.logger.error "FAILED to create record via Nokogiri fallback."
+            end
+            return
+          else
+            Rails.logger.error "No coordinates found in Nokogiri parsed LineString."
+            @errors << "No coordinates found in the KML file."
+            return
+          end
+        else
+          Rails.logger.error "No valid polygon or linestring features found in the KML file."
+          @errors << "No valid polygon or linestring features found in the KML file."
+          return
+        end
+      end
+
+      # If features are found via the gem, use them.
       geometry_source = nil
       feature_type = nil
 
@@ -58,10 +119,6 @@ class KMLUploader
       elsif linestring_count > 0
         geometry_source = reader.linestrings.first
         feature_type = 'linestring'
-      else
-        Rails.logger.error "No valid polygon or linestring features found in the KML file."
-        @errors << "No valid polygon or linestring features found in the KML file."
-        return
       end
 
       Rails.logger.info "Processing a new #{feature_type}: #{geometry_source.inspect}"
@@ -121,6 +178,7 @@ class KMLUploader
       else
         Rails.logger.info "Skipping record creation because model/dashboard mode conditions are not met."
       end
+
     rescue StandardError => ex
       Rails.logger.error "Exception encountered in load_kmlfile: #{ex.message}"
       puts ex.message
