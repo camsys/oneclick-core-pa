@@ -38,35 +38,29 @@ class KMLUploader
   private
 
   def load_kmlfile(file_name)
-    Rails.logger.info "Reading Shapes into #{@model.to_s} Table..."
+    Rails.logger.info "Reading Shapes into #{@model} Table..."
     begin
       reader = Geospatial::KML::Reader.load_file(@path)
+    if reader.polygons.any?
       reader.polygons do |polygon|
         fail_count = 0
         if @model.name == CustomGeography.name && Config.dashboard_mode == 'travel_patterns'
-          attrs = {}
           if reader.polygons.count > 1
             @warnings << 'Found multiple features while creating a custom geography. Uploader only accepts one feature'
           else
-            first_shape = polygon
             Rails.logger.info "Loading #{@name}..."
             polygon_points = []
             polygon.points.each do |point|
-              point_str = [point[0], point[1]].join(" ")
-              polygon_points.push(point_str.to_s)
+              polygon_points.push([point[0], point[1]].join(" "))
             end
-            polygon_wkt = 'POLYGON((' + polygon_points.join(", ").to_s + '))'
+            polygon_wkt = 'POLYGON((' + polygon_points.join(", ") + '))'
             factory = RGeo::ActiveRecord::SpatialFactoryStore.instance.default
             polygon_geom = factory.parse_wkt(polygon_wkt)
             output_geom = factory.multi_polygon([]).union(polygon_geom)
             geom = RGeo::Feature.cast(output_geom, RGeo::Feature::MultiPolygon)
-            #Rails.logger.info "Parsed #{geom.to_s}"
-
             record = ActiveRecord::Base.logger.silence do
               @custom_geo = @model.create({ name: @name, agency: @agency })
-              @custom_geo.update_attributes(geom:geom)
-              # generally, the only error we're going to get are either the geometry is invalid
-              # or the name was taken already
+              @custom_geo.update_attributes(geom: geom)
               if @custom_geo.errors.present?
                 @errors << "#{@custom_geo.errors.full_messages.to_sentence} for #{@custom_geo.name}."
               else
@@ -80,8 +74,38 @@ class KMLUploader
             Rails.logger.info " FAILED."
             fail_count += 1
           end
-        @errors << "#{fail_count} record(s) failed to load." if fail_count > 0
+          @errors << "#{fail_count} record(s) failed to load." if fail_count > 0
         end
+      end
+    elsif reader.respond_to?(:linestrings) && reader.linestrings.any?
+        # If no polygons, use the first LineString and convert it to a polygon
+        linestring = reader.linestrings.first
+        points = linestring.points
+        points << points.first unless points.first == points.last
+        polygon_points = points.map { |point| [point[0], point[1]].join(" ") }
+        polygon_wkt = 'POLYGON((' + polygon_points.join(", ") + '))'
+        factory = RGeo::ActiveRecord::SpatialFactoryStore.instance.default
+        polygon_geom = factory.parse_wkt(polygon_wkt)
+        output_geom = factory.multi_polygon([]).union(polygon_geom)
+        geom = RGeo::Feature.cast(output_geom, RGeo::Feature::MultiPolygon)
+        if @model.name == CustomGeography.name && Config.dashboard_mode == 'travel_patterns'
+          record = ActiveRecord::Base.logger.silence do
+            @custom_geo = @model.create({ name: @name, agency: @agency })
+            @custom_geo.update_attributes(geom: geom)
+            if @custom_geo.errors.present?
+              @errors << "#{@custom_geo.errors.full_messages.to_sentence} for #{@custom_geo.name}."
+            else
+              @custom_geo
+            end
+          end
+          if record
+            Rails.logger.info " SUCCESS!"
+          else
+            Rails.logger.info " FAILED."
+          end
+        end
+      else
+        @errors << "No valid polygon or linestring features found in the KML file."
       end
     rescue StandardError => ex
       puts ex.message
