@@ -145,8 +145,13 @@
 
       // Click handler for adding new schedules
       $('.add-day-schedule').click(function() {
-        var day = $(this).siblings('.sub-schedule-container').data().day;
-        weeklySch.addSchedule(day).trigger('change');
+        var parentContainer = $(this).closest('.form-inline');
+        if (parentContainer.hasClass('schedule-week-container')) {
+          var day = $(this).siblings('.sub-schedule-container').data().day;
+          weeklySch.addSchedule(day).trigger('change');
+        } else if (parentContainer.hasClass('schedule-calendar-times-container')) {
+          calendarTimeSch.addSchedule(null).trigger('change');
+        }
       });
       $('.add-calendar-date-schedule').click(function() {
         calendarDateSch.addSchedule(null).trigger('change');

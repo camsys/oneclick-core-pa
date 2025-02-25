@@ -1,6 +1,6 @@
 class Admin::ReportsController < Admin::AdminController
   
-  DOWNLOAD_TABLES = ['Trips', 'Users', 'Services', 'Requests', 'Feedback', 'Feedback Aggregated', 'Find Services']
+  DOWNLOAD_TABLES = ['Trips', 'Users', 'Feedback', 'Feedback Aggregated', 'Find Services']
   DASHBOARDS = ['Planned Trips', 'Unique Users', 'Popular Destinations']
   GROUPINGS = [:hour, :day, :week, :month, :quarter, :year, :day_of_week, :month_of_year]
   
@@ -132,12 +132,12 @@ class Admin::ReportsController < Admin::AdminController
         actual_status = trip.disposition_status
         # Check the snapshot status of the trip  
         snapshot_status = trip.ecolane_booking_snapshot&.disposition_status
-        
+
         # Return true if the trip was denied by Ecolane and has a snapshot that was also denied
         actual_status == Trip::DISPOSITION_STATUSES[:ecolane_denied] &&
           (snapshot_status.nil? || snapshot_status == Trip::DISPOSITION_STATUSES[:ecolane_denied])
       end.map(&:id)
-      
+
       @trips = @trips.where(id: matching_trip_ids)
     end    
 
@@ -146,6 +146,7 @@ class Admin::ReportsController < Admin::AdminController
       format.csv { send_data @trips.to_csv(limit: CSVWriter::DEFAULT_RECORD_LIMIT, in_travel_patterns_mode: in_travel_patterns_mode?) }
     end
   end
+  
 
   def in_travel_patterns_mode?
     Config.dashboard_mode.to_sym == :travel_patterns
