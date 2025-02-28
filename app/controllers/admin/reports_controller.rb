@@ -132,16 +132,20 @@ class Admin::ReportsController < Admin::AdminController
         actual_status = trip.disposition_status
         # Check the snapshot status of the trip  
         snapshot_status = trip.ecolane_booking_snapshot&.disposition_status
-        # Check for a denied error message in the snapshot
+        # Check for any error message in the snapshot
         error_message = trip.ecolane_booking_snapshot&.ecolane_error_message
     
         # Log details to understand the statuses and messages
         Rails.logger.info "Checking Trip ID: #{trip.id} (Disposition Status: #{actual_status})"
         Rails.logger.info "Snapshot Status: #{snapshot_status}, Error Message: #{error_message}"
     
-        # Return true if the trip was denied by Ecolane and has a snapshot that was also denied or has a denial error message
+        # If there is any error message or the snapshot status is 'Ecolane booking denial', consider it denied
         condition_met = actual_status == Trip::DISPOSITION_STATUSES[:ecolane_denied] &&
-                        (snapshot_status.nil? || snapshot_status == Trip::DISPOSITION_STATUSES[:ecolane_denied] || error_message&.include?("this trip cannot be scheduled due to run availability"))
+                        (
+                          snapshot_status.nil? || 
+                          snapshot_status == Trip::DISPOSITION_STATUSES[:ecolane_denied] ||
+                          !error_message.nil? # Include if there's any error message
+                        )
     
         # Log whether the condition was met or not
         if condition_met
