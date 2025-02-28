@@ -127,7 +127,7 @@ class Admin::ReportsController < Admin::AdminController
     # For travel patterns mode: filter trips based on disposition logic for snapshots.
     if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
       # Filter trips that were denied by Ecolane and have no snapshot or have a snapshot that was also denied
-      matching_trip_ids = @trips.select do |trip|
+      @trips = @trips.select do |trip|
         # Check the actual status of the trip
         actual_status = trip.disposition_status
         # Check the snapshot status of the trip  
@@ -155,13 +155,11 @@ class Admin::ReportsController < Admin::AdminController
         end
     
         condition_met
-      end.map(&:id)
-    
-      @trips = @trips.where(id: matching_trip_ids)
+      end
     
       # Log the final trips being included
       Rails.logger.info "Total matching trips: #{@trips.count}"
-    end    
+    end      
   
     @trips = @trips.order(:trip_time)
     trip_ids = @trips.pluck(:id)
