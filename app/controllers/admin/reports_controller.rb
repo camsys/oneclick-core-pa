@@ -121,16 +121,12 @@ class Admin::ReportsController < Admin::AdminController
       trips = trips.joins(itineraries: :booking)
                    .where(itineraries: { trip_type: 'paratransit' }, bookings: { created_in_1click: true })
     end
-  
-    # For travel patterns mode: filter trips based on disposition logic.
+    
+    # For travel patterns mode: filter trips based on disposition logic for snapshots.
     if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
-      matching_trip_ids = trips.select do |trip|
-        actual_status = trip.disposition_status
-        snapshot_status = trip.ecolane_booking_snapshot&.disposition_status
-        actual_status == Trip::DISPOSITION_STATUSES[:ecolane_denied] &&
-          (snapshot_status.nil? || snapshot_status == Trip::DISPOSITION_STATUSES[:ecolane_denied])
-      end.map(&:id)
-      trips = trips.where(id: matching_trip_ids)
+      denied_snapshots = EcolaneBookingSnapshot.where(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_denied])
+      denied_trip_ids = denied_snapshots.pluck(:trip_id)
+      trips = trips.where(id: denied_trip_ids)
     end
   
     trips = trips.order(:trip_time)
