@@ -15,8 +15,15 @@ module Admin
     end
 
     def disposition_status
-      @record.disposition_status || 'N/A'
-    end
+      snapshot_status = @record.ecolane_booking_snapshot&.disposition_status
+      associated_trip = @record.trip
+    
+      if snapshot_status == 'Ecolane booking denial' && associated_trip && associated_trip.disposition_status == Trip::DISPOSITION_STATUSES[:ecolane_denied]
+        return 'Ecolane booking denial'
+      else
+        return snapshot_status || 'Unknown Disposition'
+      end
+    end    
 
     def purpose
       @record.purpose || 'N/A'
