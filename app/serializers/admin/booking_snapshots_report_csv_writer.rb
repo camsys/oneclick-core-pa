@@ -15,15 +15,7 @@ module Admin
     end
 
     def disposition_status
-      snapshot_status = @record.disposition_status
-      associated_trip = @record.trip
-
-      # If the snapshot status is "Ecolane booking denial" and the associated trip's disposition is also "Ecolane booking denial", return that
-      if snapshot_status == Trip::DISPOSITION_STATUSES[:ecolane_denied] && associated_trip && associated_trip.disposition_status == Trip::DISPOSITION_STATUSES[:ecolane_denied]
-        return Trip::DISPOSITION_STATUSES[:ecolane_denied]
-      else
-        return snapshot_status || 'Unknown Disposition'
-      end
+      @record.disposition_status || 'N/A'
     end
 
     def purpose
