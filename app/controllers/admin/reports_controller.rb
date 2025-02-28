@@ -130,7 +130,7 @@ class Admin::ReportsController < Admin::AdminController
     end
   
     trips = trips.order(:trip_time)
-    trip_ids = trips.pluck(:id)
+    trip_ids = trips.pluck.distinct(:id)
   
     # Now query snapshots only for these trip IDs.
     snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
