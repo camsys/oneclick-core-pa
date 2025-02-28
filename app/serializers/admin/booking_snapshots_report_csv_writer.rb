@@ -4,7 +4,7 @@ module Admin
             :orig_lat, :orig_lng, :dest_lat, :dest_lng, :agency_name, :service_name,
             :booking_id, :booking_client_id, :is_round_trip, :booking_timestamp,
             :ecolane_error_message, :funding_source, :sponsor, :companions, :trip_note,
-            :pca, :orig_addr, :dest_addr
+            :pca, :orig_addr, :dest_addr, :arrive_by 
 
     def trip_time
       @record.negotiated_pu || 'No Trip Time'
@@ -92,6 +92,12 @@ module Admin
 
     def dest_addr
       @record.dest_addr || 'No Destination Address'
+    end
+
+    def arrive_by
+      if @record.trip.present?
+        @record.trip.arrive_by || 'N/A'
+      end
     end
   end
 end
