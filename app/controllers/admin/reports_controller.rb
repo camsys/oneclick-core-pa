@@ -129,7 +129,9 @@ class Admin::ReportsController < Admin::AdminController
       trips = trips.where(id: denied_trip_ids)
     end
   
-    trips = trips.select('trips.id, trips.trip_time').distinct.order(:trip_time)
+    trips = trips.select('trips.id, trips.trip_time')
+    .distinct
+    .order('trips.trip_time ASC')
     trip_ids = trips.distinct.pluck(:id)
   
     # Now query snapshots only for these trip IDs.
