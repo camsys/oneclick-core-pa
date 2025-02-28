@@ -132,14 +132,16 @@ class Admin::ReportsController < Admin::AdminController
         actual_status = trip.disposition_status
         # Check the snapshot status of the trip  
         snapshot_status = trip.ecolane_booking_snapshot&.disposition_status
-        
-        # Return true if the trip was denied by Ecolane and has a snapshot that was also denied
+        # Check for a denied error message in the snapshot
+        error_message = trip.ecolane_booking_snapshot&.ecolane_error_message
+    
+        # Return true if the trip was denied by Ecolane and has a snapshot that was also denied or has a denial error message
         actual_status == Trip::DISPOSITION_STATUSES[:ecolane_denied] &&
-          (snapshot_status.nil? || snapshot_status == Trip::DISPOSITION_STATUSES[:ecolane_denied])
+          (snapshot_status.nil? || snapshot_status == "Ecolane booking denial" || error_message&.include?("this trip cannot be scheduled due to run availability"))
       end.map(&:id)
-  
+    
       @trips = @trips.where(id: matching_trip_ids)
-    end
+    end    
   
     @trips = @trips.order(:trip_time)
     trip_ids = @trips.pluck(:id)
