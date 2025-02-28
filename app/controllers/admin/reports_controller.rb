@@ -135,12 +135,28 @@ class Admin::ReportsController < Admin::AdminController
         # Check for a denied error message in the snapshot
         error_message = trip.ecolane_booking_snapshot&.ecolane_error_message
     
+        # Log details to understand the statuses and messages
+        Rails.logger.info "Checking Trip ID: #{trip.id} (Disposition Status: #{actual_status})"
+        Rails.logger.info "Snapshot Status: #{snapshot_status}, Error Message: #{error_message}"
+    
         # Return true if the trip was denied by Ecolane and has a snapshot that was also denied or has a denial error message
-        actual_status == Trip::DISPOSITION_STATUSES[:ecolane_denied] &&
-          (snapshot_status.nil? || snapshot_status == "Ecolane booking denial" || error_message&.include?("this trip cannot be scheduled due to run availability"))
+        condition_met = actual_status == Trip::DISPOSITION_STATUSES[:ecolane_denied] &&
+                        (snapshot_status.nil? || snapshot_status == Trip::DISPOSITION_STATUSES[:ecolane_denied] || error_message&.include?("this trip cannot be scheduled due to run availability"))
+    
+        # Log whether the condition was met or not
+        if condition_met
+          Rails.logger.info "Trip ID: #{trip.id} matches the criteria and will be included."
+        else
+          Rails.logger.info "Trip ID: #{trip.id} does NOT match the criteria and will NOT be included."
+        end
+    
+        condition_met
       end.map(&:id)
     
       @trips = @trips.where(id: matching_trip_ids)
+    
+      # Log the final trips being included
+      Rails.logger.info "Total matching trips: #{@trips.count}"
     end    
   
     @trips = @trips.order(:trip_time)
