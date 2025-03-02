@@ -117,32 +117,30 @@ class Admin::ReportsController < Admin::AdminController
     @trips = @trips.origin_in(@trip_origin_region.geom) unless @trip_origin_region.empty?
     @trips = @trips.destination_in(@trip_destination_region.geom) unless @trip_destination_region.empty?
     @trips = @trips.oversight_agency_in(@oversight_agency) unless @oversight_agency.blank?
+    
     if @trip_only_created_in_1click
       @trips = @trips.joins(itineraries: :booking)
                      .where(itineraries: { trip_type: 'paratransit' }, bookings: { created_in_1click: true })
     end
   
     if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
-      @trips = @trips.order(:trip_time)
-  
-      @trips = @trips.select do |trip|
+      @trips = @trips.order(:trip_time).select do |trip|
         snapshot_status = trip.ecolane_booking_snapshot&.disposition_status
         error_message = trip.ecolane_booking_snapshot&.ecolane_error_message
   
         Rails.logger.info "Checking Trip ID: #{trip.id} (Snapshot Status: #{snapshot_status}, Error Message: #{error_message})"
   
-        condition_met = (snapshot_status == "Ecolane booking denial" || !error_message.nil?)
-  
-        Rails.logger.info "Trip ID: #{trip.id} #{condition_met ? 'matches' : 'does NOT match'} the criteria."
-  
-        condition_met
+        # Only check the snapshot
+        (snapshot_status == "Ecolane booking denial" || !error_message.nil?)
       end
   
+      @trips = @trips.sort_by { |trip| trip.trip_time }
       Rails.logger.info "Total matching trips: #{@trips.count}"
+    else
+      @trips = @trips.order(:trip_time)
     end
   
-    @trips = @trips.order(:trip_time)
-    trip_ids = @trips.pluck(:id)
+    trip_ids = @trips.map(&:id)
   
     snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
     snapshots = snapshots.where("negotiated_pu >= ?", @trip_time_from_date) if @trip_time_from_date.present?
@@ -158,6 +156,7 @@ class Admin::ReportsController < Admin::AdminController
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
     end
   end
+  
   
   
 
