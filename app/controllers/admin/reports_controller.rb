@@ -119,17 +119,15 @@ class Admin::ReportsController < Admin::AdminController
     @trips = @trips.oversight_agency_in(@oversight_agency) unless @oversight_agency.blank?
   
     if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
-      @trips = @trips.order(:trip_time).select do |trip|
-        snapshot_status = trip.ecolane_booking_snapshot&.disposition_status
-      end
-  
-      @trips = @trips.sort_by { |trip| trip.trip_time }
+      @trips = @trips.joins(:ecolane_booking_snapshot)
+                     .where(ecolane_booking_snapshots: { disposition_status: "Ecolane booking denial" })
+                     .order(:trip_time)
       Rails.logger.info "Total matching trips: #{@trips.count}"
     else
       @trips = @trips.order(:trip_time)
     end
   
-    trip_ids = @trips.map(&:id)
+    trip_ids = @trips.pluck(:id)
   
     snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
     snapshots = snapshots.where("negotiated_pu >= ?", @trip_time_from_date) if @trip_time_from_date.present?
