@@ -110,10 +110,8 @@ class Admin::ReportsController < Admin::AdminController
   end
   
   def trips_table
-    # Apply all the trip filters to get the correct set of trip IDs.
     @trips = current_user.get_trips_for_staff_user.limit(CSVWriter::DEFAULT_RECORD_LIMIT)
   
-    # Filter trips based on inputs
     @trips = @trips.from_date(@trip_time_from_date).to_date(@trip_time_to_date)
     @trips = @trips.with_purpose(Purpose.where(id: @purposes).pluck(:name)) unless @purposes.empty?
     @trips = @trips.origin_in(@trip_origin_region.geom) unless @trip_origin_region.empty?
@@ -124,50 +122,28 @@ class Admin::ReportsController < Admin::AdminController
                      .where(itineraries: { trip_type: 'paratransit' }, bookings: { created_in_1click: true })
     end
   
-    # For travel patterns mode: filter trips based on disposition logic for snapshots.
     if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
-      # Filter trips that were denied by Ecolane and have no snapshot or have a snapshot that was also denied
       @trips = @trips.order(:trip_time)
-      
+  
       @trips = @trips.select do |trip|
-        # Check the actual status of the trip
-        actual_status = trip.disposition_status
-        # Check the snapshot status of the trip  
         snapshot_status = trip.ecolane_booking_snapshot&.disposition_status
-        # Check for any error message in the snapshot
         error_message = trip.ecolane_booking_snapshot&.ecolane_error_message
-    
-        # Log details to understand the statuses and messages
-        Rails.logger.info "Checking Trip ID: #{trip.id} (Disposition Status: #{actual_status})"
-        Rails.logger.info "Snapshot Status: #{snapshot_status}, Error Message: #{error_message}"
-    
-        # If there is any error message or the snapshot status is 'Ecolane booking denial', consider it denied
-        condition_met = actual_status == Trip::DISPOSITION_STATUSES[:ecolane_denied] &&
-                        (
-                          snapshot_status.nil? || 
-                          snapshot_status == Trip::DISPOSITION_STATUSES[:ecolane_denied] ||
-                          !error_message.nil? # Include if there's any error message
-                        )
-    
-        # Log whether the condition was met or not
-        if condition_met
-          Rails.logger.info "Trip ID: #{trip.id} matches the criteria and will be included."
-        else
-          Rails.logger.info "Trip ID: #{trip.id} does NOT match the criteria and will NOT be included."
-        end
-    
+  
+        Rails.logger.info "Checking Trip ID: #{trip.id} (Snapshot Status: #{snapshot_status}, Error Message: #{error_message})"
+  
+        condition_met = (snapshot_status == "Ecolane booking denial" || !error_message.nil?)
+  
+        Rails.logger.info "Trip ID: #{trip.id} #{condition_met ? 'matches' : 'does NOT match'} the criteria."
+  
         condition_met
       end
-    
-      # Log the final trips being included
+  
       Rails.logger.info "Total matching trips: #{@trips.count}"
     end
-        
   
     @trips = @trips.order(:trip_time)
     trip_ids = @trips.pluck(:id)
   
-    # Now query snapshots only for these trip IDs.
     snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
     snapshots = snapshots.where("negotiated_pu >= ?", @trip_time_from_date) if @trip_time_from_date.present?
     snapshots = snapshots.where("negotiated_pu <= ?", @trip_time_to_date) if @trip_time_to_date.present?
@@ -181,7 +157,8 @@ class Admin::ReportsController < Admin::AdminController
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
     end
-  end  
+  end
+  
   
 
   def in_travel_patterns_mode?
