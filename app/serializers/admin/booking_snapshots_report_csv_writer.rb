@@ -4,8 +4,8 @@ module Admin
             :orig_lat, :orig_lng, :dest_lat, :dest_lng, :agency_name, :service_name,
             :booking_id, :booking_client_id, :is_round_trip, :booking_timestamp,
             :ecolane_error_message, :funding_source, :sponsor, :companions, :trip_note,
-            :pca, :orig_addr, :dest_addr
-            
+            :pca, :orig_addr, :dest_addr, :arrive_by
+
     def trip_time
       @record.negotiated_pu || 'No Trip Time'
     end
@@ -15,8 +15,15 @@ module Admin
     end
 
     def disposition_status
-      @record.disposition_status || 'Unknown Disposition'
-    end
+      snapshot_status = @record&.disposition_status
+      associated_trip = @record.trip
+    
+      if snapshot_status == 'Ecolane booking denial' && associated_trip && associated_trip.disposition_status == Trip::DISPOSITION_STATUSES[:ecolane_denied]
+        return 'Ecolane booking denial'
+      else
+        return snapshot_status || 'Unknown Disposition'
+      end
+    end    
 
     def purpose
       @record.purpose || 'N/A'

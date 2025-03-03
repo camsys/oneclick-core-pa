@@ -111,42 +111,41 @@ class Admin::ReportsController < Admin::AdminController
   
   def trips_table
     # Apply all the trip filters to get the correct set of trip IDs.
-    trips = current_user.get_trips_for_staff_user
-    trips = trips.from_date(@trip_time_from_date).to_date(@trip_time_to_date)
-    trips = trips.with_purpose(Purpose.where(id: @purposes).pluck(:name)) unless @purposes.empty?
-    trips = trips.origin_in(@trip_origin_region.geom) unless @trip_origin_region.empty?
-    trips = trips.destination_in(@trip_destination_region.geom) unless @trip_destination_region.empty?
-    trips = trips.oversight_agency_in(@oversight_agency) unless @oversight_agency.blank?
+    @trips = current_user.get_trips_for_staff_user.limit(CSVWriter::DEFAULT_RECORD_LIMIT)
+    @trips = @trips.from_date(@trip_time_from_date).to_date(@trip_time_to_date)
+    @trips = @trips.with_purpose(Purpose.where(id: @purposes).pluck(:name)) unless @purposes.empty?
+    @trips = @trips.origin_in(@trip_origin_region.geom) unless @trip_origin_region.empty?
+    @trips = @trips.destination_in(@trip_destination_region.geom) unless @trip_destination_region.empty?
+    @trips = @trips.oversight_agency_in(@oversight_agency) unless @oversight_agency.blank?
     if @trip_only_created_in_1click
       trips = trips.joins(itineraries: :booking)
                    .where(itineraries: { trip_type: 'paratransit' }, bookings: { created_in_1click: true })
     end
-    
-    # For travel patterns mode: filter trips based on disposition logic for snapshots.
     if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
-      denied_snapshots = EcolaneBookingSnapshot.where(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_denied])
-      denied_trip_ids = denied_snapshots.pluck(:trip_id)
-      trips = trips.where(id: denied_trip_ids)
+      # Only consider trips that have a snapshot with a denied disposition.
+      @trips = @trips.joins(:ecolane_booking_snapshot)
+                     .where(ecolane_booking_snapshots: { disposition_status: "Ecolane booking denial" })
+                     .order(:trip_time)
+      trip_ids = @trips.pluck(:id)
+      snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
+                                        .where(disposition_status: "Ecolane booking denial")
+    else
+      @trips = @trips.order(:trip_time)
+      trip_ids = @trips.pluck(:id)
+      snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
+      snapshots = snapshots.where("negotiated_pu >= ?", @trip_time_from_date) if @trip_time_from_date.present?
+      snapshots = snapshots.where("negotiated_pu <= ?", @trip_time_to_date) if @trip_time_to_date.present?
+      unless @purposes.empty?
+        purpose_names = Purpose.where(id: @purposes).pluck(:name)
+        snapshots = snapshots.where(purpose: purpose_names)
+      end
+      snapshots = snapshots.order("negotiated_pu")
     end
-  
-    trips = trips.order(:trip_time)
-    trip_ids = trips.pluck.distinct(:id)
-  
-    # Now query snapshots only for these trip IDs.
-    snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
-    snapshots = snapshots.where("negotiated_pu >= ?", @trip_time_from_date) if @trip_time_from_date.present?
-    snapshots = snapshots.where("negotiated_pu <= ?", @trip_time_to_date) if @trip_time_to_date.present?
-    unless @purposes.empty?
-      purpose_names = Purpose.where(id: @purposes).pluck(:name)
-      snapshots = snapshots.where(purpose: purpose_names)
-    end
-  
-    snapshots = snapshots.order("negotiated_pu")
   
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
     end
-  end   
+  end
   
 
   def in_travel_patterns_mode?
