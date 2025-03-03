@@ -118,9 +118,9 @@ class Admin::ReportsController < Admin::AdminController
     @trips = @trips.destination_in(@trip_destination_region.geom) unless @trip_destination_region.empty?
     @trips = @trips.oversight_agency_in(@oversight_agency) unless @oversight_agency.blank?
     if @trip_only_created_in_1click
-      trips = trips.joins(itineraries: :booking)
-                   .where(itineraries: { trip_type: 'paratransit' }, bookings: { created_in_1click: true })
-    end
+      @trips = @trips.joins(itineraries: :booking)
+                     .where(itineraries: { trip_type: 'paratransit' }, bookings: { created_in_1click: true })
+    end    
     if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
       # Only consider trips that have a snapshot with a denied disposition.
       @trips = @trips.joins(:ecolane_booking_snapshot)
