@@ -7,8 +7,8 @@ module Admin
             :pca, :orig_addr, :dest_addr, :arrive_by
 
     def trip_time
-      @record.negotiated_pu || 'No Trip Time'
-    end
+      @record.negotiated_pu || @record.trip&.trip_time || 'No Trip Time'
+    end   
 
     def traveler
       @record.traveler || 'No Traveler'
