@@ -139,7 +139,7 @@ class Admin::ReportsController < Admin::AdminController
         purpose_names = Purpose.where(id: @purposes).pluck(:name)
         snapshots = snapshots.where(purpose: purpose_names)
       end
-      snapshots = snapshots.order("negotiated_pu")
+      snapshots = snapshots.order("negotiated_pu").distinct(:booking_id)
     end
   
     respond_to do |format|
