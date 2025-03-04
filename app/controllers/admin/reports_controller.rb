@@ -140,8 +140,9 @@ class Admin::ReportsController < Admin::AdminController
         snapshots = snapshots.where(purpose: purpose_names)
       end
     end
-    
-    snapshots = snapshots.order(:booking_id, :negotiated_pu).uniq { |s| s.booking_id }
+
+    snapshots = snapshots.order(:negotiated_pu)
+                        .select('DISTINCT ON (booking_id) *')
 
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
