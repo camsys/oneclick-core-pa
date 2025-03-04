@@ -140,20 +140,18 @@ class Admin::ReportsController < Admin::AdminController
         snapshots = snapshots.where(purpose: purpose_names)
       end
     end
-    
+
     Rails.logger.info "Checking for duplicate booking IDs..."
 
-    seen = {}
-    snapshots.each do |s|
-      if seen[s.booking_id]
-        Rails.logger.info "Duplicate found - Booking ID: #{s.booking_id}, Negotiated PU: #{s.negotiated_pu}"
-      else
-        seen[s.booking_id] = true
-      end
+    snapshots = snapshots.order(:negotiated_pu).uniq(&:booking_id)
+    
+    # Log only when duplicates are found
+    duplicate_ids = snapshots.group_by(&:booking_id).select { |_, v| v.size > 1 }.keys
+    duplicate_ids.each do |booking_id|
+      Rails.logger.info "Duplicate found - Booking ID: #{booking_id}"
     end
     
-    # Deduplicate while preserving order
-    snapshots = snapshots.order(:negotiated_pu).group_by(&:booking_id).map { |_, group| group.first }
+    Rails.logger.info "Total unique booking snapshots: #{snapshots.count}"
     
 
     respond_to do |format|
