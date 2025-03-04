@@ -139,9 +139,10 @@ class Admin::ReportsController < Admin::AdminController
         purpose_names = Purpose.where(id: @purposes).pluck(:name)
         snapshots = snapshots.where(purpose: purpose_names)
       end
-      snapshots = snapshots.order(:booking_id, :negotiated_pu).uniq { |s| s.booking_id }
     end
-  
+    
+    snapshots = snapshots.order(:booking_id, :negotiated_pu).uniq { |s| s.booking_id }
+
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
     end
