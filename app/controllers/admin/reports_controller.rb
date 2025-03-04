@@ -139,7 +139,7 @@ class Admin::ReportsController < Admin::AdminController
         purpose_names = Purpose.where(id: @purposes).pluck(:name)
         snapshots = snapshots.where(purpose: purpose_names)
       end
-      snapshots = snapshots.order(:booking_id, :negotiated_pu).uniq { |s| s.booking_id }
+      snapshots = snapshots.uniq { |s| s.booking_id }
     end
   
     respond_to do |format|
