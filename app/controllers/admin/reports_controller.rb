@@ -117,10 +117,7 @@ class Admin::ReportsController < Admin::AdminController
     @trips = @trips.origin_in(@trip_origin_region.geom) unless @trip_origin_region.empty?
     @trips = @trips.destination_in(@trip_destination_region.geom) unless @trip_destination_region.empty?
     @trips = @trips.oversight_agency_in(@oversight_agency) unless @oversight_agency.blank?
-    if @trip_only_created_in_1click
-      @trips = @trips.joins(itineraries: :booking)
-                     .where(itineraries: { trip_type: 'paratransit' }, bookings: { created_in_1click: true })
-    end    
+  
     if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
       # Only consider trips that have a snapshot with a denied disposition.
       @trips = @trips.joins(:ecolane_booking_snapshot)
@@ -139,26 +136,12 @@ class Admin::ReportsController < Admin::AdminController
         purpose_names = Purpose.where(id: @purposes).pluck(:name)
         snapshots = snapshots.where(purpose: purpose_names)
       end
+      snapshots = snapshots.order("negotiated_pu")
     end
-
-    Rails.logger.info "Checking for duplicate booking IDs..."
-
-    snapshots = snapshots.order(:negotiated_pu).to_a
-    
-    # Group by booking_id, log duplicates, keep earliest snapshot
-    snapshots = snapshots.group_by(&:booking_id).flat_map do |booking_id, group|
-      if group.size > 1
-        group.drop(1).each do |dup|
-          Rails.logger.info "Duplicate found - Booking ID: #{booking_id}, Negotiated PU: #{dup.negotiated_pu}"
-        end
-      end
-      group.first  # keep only the earliest
-    end
-    
+  
     respond_to do |format|
-      format.csv { send_data snapshots.to_csv(Admin::BookingSnapshotsReportCSVWriter) }
-    end    
-     
+      format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
+    end
   end
   
 
