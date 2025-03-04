@@ -143,20 +143,20 @@ class Admin::ReportsController < Admin::AdminController
 
     Rails.logger.info "Checking for duplicate booking IDs..."
 
-    snapshots = snapshots.order(:negotiated_pu).uniq(&:booking_id)
-    
-    # Log only when duplicates are found
-    duplicate_ids = snapshots.group_by(&:booking_id).select { |_, v| v.size > 1 }.keys
-    duplicate_ids.each do |booking_id|
-      Rails.logger.info "Duplicate found - Booking ID: #{booking_id}"
+    snapshots = snapshots.order(:negotiated_pu).to_a
+
+    duplicates = snapshots.group_by(&:booking_id).select { |_, group| group.size > 1 }
+    duplicates.each do |booking_id, group|
+      group.drop(1).each do |duplicate_record|
+        Rails.logger.info "Duplicate found - Booking ID: #{booking_id}, Negotiated PU: #{duplicate_record.negotiated_pu}"
+      end
     end
     
-    Rails.logger.info "Total unique booking snapshots: #{snapshots.count}"
+    snapshots.uniq! { |s| s.booking_id }
     
-
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
-    end
+    end     
   end
   
 
