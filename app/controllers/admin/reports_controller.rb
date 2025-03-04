@@ -141,9 +141,27 @@ class Admin::ReportsController < Admin::AdminController
       end
     end
 
-    snapshots = snapshots.order(:negotiated_pu)
-    .group_by(&:booking_id)
-    .map { |_, group| group.first }
+    Rails.logger.info "Total snapshots before grouping: #{snapshots.count}"
+
+    # Log the first few booking IDs to see duplicates
+    snapshots.each do |s|
+      Rails.logger.info "Snapshot - Booking ID: #{s.booking_id}, Negotiated PU: #{s.negotiated_pu}"
+    end
+    
+    # Apply ordering and deduplication
+    snapshots = snapshots.order(:negotiated_pu).to_a  # Force loading ActiveRecord relation into an array
+    grouped_snapshots = snapshots.group_by(&:booking_id)
+    
+    Rails.logger.info "Unique booking IDs count after grouping: #{grouped_snapshots.keys.count}"
+    
+    snapshots = grouped_snapshots.map do |booking_id, group|
+      chosen_snapshot = group.first  # Picking the earliest negotiated_pu snapshot
+      Rails.logger.info "Chosen Snapshot - Booking ID: #{booking_id}, Negotiated PU: #{chosen_snapshot.negotiated_pu}"
+      chosen_snapshot
+    end
+    
+    Rails.logger.info "Total snapshots after deduplication: #{snapshots.count}"
+    
 
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
