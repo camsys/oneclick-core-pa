@@ -142,7 +142,8 @@ class Admin::ReportsController < Admin::AdminController
     end
 
     snapshots = snapshots.order(:negotiated_pu)
-                        .select('DISTINCT ON (booking_id) *')
+    .group_by(&:booking_id)
+    .map { |_, group| group.first }
 
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
