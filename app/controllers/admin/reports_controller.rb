@@ -117,22 +117,31 @@ class Admin::ReportsController < Admin::AdminController
     @trips = @trips.origin_in(@trip_origin_region.geom) unless @trip_origin_region.empty?
     @trips = @trips.destination_in(@trip_destination_region.geom) unless @trip_destination_region.empty?
     @trips = @trips.oversight_agency_in(@oversight_agency) unless @oversight_agency.blank?
+
     if @trip_only_created_in_1click
       @trips = @trips.joins(itineraries: :booking)
-                     .where(itineraries: { trip_type: 'paratransit' }, bookings: { created_in_1click: true })
+                    .where(itineraries: { trip_type: 'paratransit' }, bookings: { created_in_1click: true })
     end    
+
     if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
-      # Only consider trips that have a snapshot with a denied disposition.
       @trips = @trips.joins(:ecolane_booking_snapshot)
-                     .where(ecolane_booking_snapshots: { disposition_status: "Ecolane booking denial" })
-                     .order(:trip_time)
+                    .where(ecolane_booking_snapshots: { disposition_status: "Ecolane booking denial" })
+                    .order(:trip_time)
+
       trip_ids = @trips.pluck(:id)
+
       snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
                                         .where(disposition_status: "Ecolane booking denial")
+                                        .select('DISTINCT ON (booking_id) *')  # Select only the first snapshot per booking_id
+                                        .order(:booking_id, :negotiated_pu)   # Order by booking_id first, then negotiated_pu
     else
       @trips = @trips.order(:trip_time)
       trip_ids = @trips.pluck(:id)
+
       snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
+                                        .select('DISTINCT ON (booking_id) *')  # Select only the first snapshot per booking_id
+                                        .order(:booking_id, :negotiated_pu)   # Order by booking_id first, then negotiated_pu
+
       snapshots = snapshots.where("negotiated_pu >= ?", @trip_time_from_date) if @trip_time_from_date.present?
       snapshots = snapshots.where("negotiated_pu <= ?", @trip_time_to_date) if @trip_time_to_date.present?
       unless @purposes.empty?
@@ -141,23 +150,12 @@ class Admin::ReportsController < Admin::AdminController
       end
     end
 
-    Rails.logger.info "Checking for duplicate booking IDs..."
+    Rails.logger.info "Final snapshot count: #{snapshots.count}"
 
-    snapshots = snapshots.order(:negotiated_pu).to_a
-
-    duplicates = snapshots.group_by(&:booking_id).select { |_, group| group.size > 1 }
-    duplicates.each do |booking_id, group|
-      group.drop(1).each do |dup|
-        Rails.logger.info "Duplicate found - Booking ID: #{booking_id}, Negotiated PU: #{dup.negotiated_pu}"
-      end
-    end
-    
-    snapshots.uniq! { |s| s.booking_id }
-    
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(Admin::BookingSnapshotsReportCSVWriter) }
     end
-     
+
   end
   
 
