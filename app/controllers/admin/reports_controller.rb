@@ -137,13 +137,15 @@ class Admin::ReportsController < Admin::AdminController
         snapshots = snapshots.where(purpose: purpose_names)
       end
     end
-
-    snapshots = snapshots.order("negotiated_pu")          
-    snapshots = snapshots.to_a.uniq { |s| s.booking_id } 
+    snapshots = snapshots.order("negotiated_pu").to_a
+    snapshots.uniq! { |s| s.booking_id } # keep earliest snapshot for each booking_id
     
     respond_to do |format|
-      format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
-    end
+      format.csv do
+        csv_data = Admin::BookingSnapshotsReportCSVWriter.new(snapshots).write_file
+        send_data csv_data, filename: "snapshots.csv"
+      end
+    end    
   end
   
 
