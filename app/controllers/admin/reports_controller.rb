@@ -152,7 +152,7 @@ class Admin::ReportsController < Admin::AdminController
     # If you want the final CSV sorted by 'trip_time', change to .order("ecolane_booking_snapshots.trip_time")
     snapshots = EcolaneBookingSnapshot
       .from("(#{distinct_subquery}) AS ecolane_booking_snapshots")
-      .order("ecolane_booking_snapshots.trip_time")
+      .order("ecolane_booking_snapshots.negotiated_pu")
   
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
