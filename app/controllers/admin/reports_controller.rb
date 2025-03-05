@@ -129,7 +129,7 @@ class Admin::ReportsController < Admin::AdminController
                      .where(ecolane_booking_snapshots: { disposition_status: "Ecolane booking denial" })
                      .order(:trip_time)
       trip_ids = @trips.pluck(:id)
-      snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids, disposition_status: "Ecolane booking denial")
+      snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids, disposition_status: "Ecolane booking denial").order(:negotiated_pu)
     else
       @trips = @trips.order(:trip_time)
       trip_ids = @trips.pluck(:id)
