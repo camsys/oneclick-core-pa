@@ -117,30 +117,51 @@ class Admin::ReportsController < Admin::AdminController
     @trips = @trips.origin_in(@trip_origin_region.geom) unless @trip_origin_region.empty?
     @trips = @trips.destination_in(@trip_destination_region.geom) unless @trip_destination_region.empty?
     @trips = @trips.oversight_agency_in(@oversight_agency) unless @oversight_agency.blank?
+  
+    # Filter for paratransit bookings created in 1click
     if @trip_only_created_in_1click
       @trips = @trips.joins(itineraries: :booking)
                      .where(itineraries: { trip_type: 'paratransit' }, bookings: { created_in_1click: true })
-    end    
+    end
+  
     if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
       # Only consider trips that have a snapshot with a denied disposition.
       @trips = @trips.joins(:ecolane_booking_snapshot)
                      .where(ecolane_booking_snapshots: { disposition_status: "Ecolane booking denial" })
                      .order(:trip_time)
+  
       trip_ids = @trips.pluck(:id)
       snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
                                         .where(disposition_status: "Ecolane booking denial")
-                                        snapshots = snapshots.unscope(:order)
-
-                                        snapshots = snapshots.select(
-                                          "DISTINCT ON (ecolane_booking_snapshots.booking_id) ecolane_booking_snapshots.*"
-                                        ).order(
-                                          "ecolane_booking_snapshots.booking_id, ecolane_booking_snapshots.negotiated_pu"
-                                        )
+  
+      # Remove any ordering from the joins, then apply DISTINCT ON
+      snapshots = snapshots.unscope(:order)
+                           .select("DISTINCT ON (ecolane_booking_snapshots.booking_id) ecolane_booking_snapshots.*")
+                           .order("ecolane_booking_snapshots.booking_id, ecolane_booking_snapshots.negotiated_pu")
+  
+    else
+      @trips = @trips.order(:trip_time)
+      trip_ids = @trips.pluck(:id)
+  
+      snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
+      snapshots = snapshots.where("negotiated_pu >= ?", @trip_time_from_date) if @trip_time_from_date.present?
+      snapshots = snapshots.where("negotiated_pu <= ?", @trip_time_to_date) if @trip_time_to_date.present?
+  
+      unless @purposes.empty?
+        purpose_names = Purpose.where(id: @purposes).pluck(:name)
+        snapshots = snapshots.where(purpose: purpose_names)
+      end
+  
+      # Remove any ordering from the scope, then apply DISTINCT ON
+      snapshots = snapshots.unscope(:order)
+                           .select("DISTINCT ON (ecolane_booking_snapshots.booking_id) ecolane_booking_snapshots.*")
+                           .order("ecolane_booking_snapshots.booking_id, ecolane_booking_snapshots.negotiated_pu")
+    end
   
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
     end
-  end
+  end  
   
 
   def in_travel_patterns_mode?
