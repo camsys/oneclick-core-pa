@@ -140,17 +140,24 @@ class Admin::ReportsController < Admin::AdminController
       end
     end
   
-    # We must explicitly use DISTINCT ON because .distinct(:booking_id) in ActiveRecord
-    # doesn't truly collapse duplicates at the SQL level. This picks the earliest negotiated_pu
-    # for each booking_id.
-    snapshots = snapshots.unscope(:order)
-                         .select("DISTINCT ON (ecolane_booking_snapshots.booking_id) ecolane_booking_snapshots.*")
-                         .order("ecolane_booking_snapshots.booking_id, ecolane_booking_snapshots.negotiated_pu")
+    # We need DISTINCT ON to pick only the earliest negotiated_pu per booking_id,
+    # but we also want the final output sorted by negotiated_pu. So we use a subquery:
+    # 1) DISTINCT ON in the subquery picks the earliest row per booking_id.
+    # 2) The outer query then sorts all those rows by negotiated_pu.
+    distinct_subquery = snapshots
+      .unscope(:order)
+      .select("DISTINCT ON (ecolane_booking_snapshots.booking_id) ecolane_booking_snapshots.*")
+      .order("ecolane_booking_snapshots.booking_id, ecolane_booking_snapshots.negotiated_pu")
+      .to_sql
+  
+    snapshots = EcolaneBookingSnapshot
+      .from("(#{distinct_subquery}) AS ecolane_booking_snapshots")
+      .order("ecolane_booking_snapshots.negotiated_pu")
   
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
     end
-  end  
+  end   
   
 
   def in_travel_patterns_mode?
