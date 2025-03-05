@@ -110,18 +110,20 @@ class Admin::ReportsController < Admin::AdminController
   end
   
   def trips_table
-    # Apply all the trip filters to get the correct set of trip IDs.
+    # Build the @trips query with all your existing filters
     @trips = current_user.get_trips_for_staff_user.limit(CSVWriter::DEFAULT_RECORD_LIMIT)
     @trips = @trips.from_date(@trip_time_from_date).to_date(@trip_time_to_date)
     @trips = @trips.with_purpose(Purpose.where(id: @purposes).pluck(:name)) unless @purposes.empty?
     @trips = @trips.origin_in(@trip_origin_region.geom) unless @trip_origin_region.empty?
     @trips = @trips.destination_in(@trip_destination_region.geom) unless @trip_destination_region.empty?
     @trips = @trips.oversight_agency_in(@oversight_agency) unless @oversight_agency.blank?
+  
     if @trip_only_created_in_1click
       @trips = @trips.joins(itineraries: :booking)
                      .where(itineraries: { trip_type: 'paratransit' }, bookings: { created_in_1click: true })
     end
-    
+  
+    # Decide which snapshots to load based on the denial flag
     if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
       @trips = @trips.joins(:ecolane_booking_snapshot)
                      .where(ecolane_booking_snapshots: { disposition_status: "Ecolane booking denial" })
@@ -140,10 +142,9 @@ class Admin::ReportsController < Admin::AdminController
       end
     end
   
-    # We need DISTINCT ON to pick only the earliest negotiated_pu per booking_id,
-    # but we also want the final output sorted by negotiated_pu. So we use a subquery:
-    # 1) DISTINCT ON in the subquery picks the earliest row per booking_id.
-    # 2) The outer query then sorts all those rows by negotiated_pu.
+    # We use a subselect so we can:
+    #   1) DISTINCT ON booking_id to pick the earliest negotiated_pu for each booking_id
+    #   2) Then sort that collapsed set by negotiated_pu globally
     distinct_subquery = snapshots
       .unscope(:order)
       .select("DISTINCT ON (ecolane_booking_snapshots.booking_id) ecolane_booking_snapshots.*")
@@ -157,7 +158,7 @@ class Admin::ReportsController < Admin::AdminController
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
     end
-  end   
+  end
   
 
   def in_travel_patterns_mode?
