@@ -251,42 +251,61 @@ class EcolaneAmbassador < BookingAmbassador
       Rails.logger.error "General error while calling Ecolane: #{e.message}"
       raise "General error while calling Ecolane: #{e.message}"
     ensure
+      Rails.logger.info "Entering ensure block in new_order"
+      
+      # Refresh the itinerary value
+      current_itinerary = self.itinerary || @trip.selected_itinerary || @trip.itineraries.first
+      Rails.logger.info "Current itinerary: #{current_itinerary.inspect}"
+      
+      current_trip = current_itinerary.trip
+      Rails.logger.info "Current trip: #{current_trip.inspect}"
+      
+      current_booking = self.booking
+      Rails.logger.info "Current booking: #{current_booking.inspect}"
+      
+      Rails.logger.info "Initial funding source: #{initial_funding_source.inspect}"
+      Rails.logger.info "Initial assistant: #{initial_assistant.inspect}"
+      Rails.logger.info "Initial companions: #{initial_companions.inspect}"
+      
       new_snapshot = EcolaneBookingSnapshot.new(
-        trip_id: trip.id,
-        itinerary_id: itinerary.id,
+        trip_id: current_trip.id,
+        itinerary_id: current_itinerary.id,
         status: eco_trip.try(:with_indifferent_access).try(:[], :status),
         confirmation: eco_trip.try(:with_indifferent_access).try(:[], :id),
         details: eco_trip ? eco_trip.to_json : nil,
-        earliest_pu: booking.earliest_pu,
-        latest_pu: booking.latest_pu,
-        negotiated_pu: booking.negotiated_pu,
-        negotiated_do: booking.negotiated_do,
-        estimated_pu: booking.estimated_pu,
-        estimated_do: booking.estimated_do,
-        created_in_1click: booking.created_in_1click,
+        earliest_pu: current_booking.earliest_pu,
+        latest_pu: current_booking.latest_pu,
+        negotiated_pu: current_booking.negotiated_pu,
+        negotiated_do: current_booking.negotiated_do,
+        estimated_pu: current_booking.estimated_pu,
+        estimated_do: current_booking.estimated_do,
+        created_in_1click: current_booking.created_in_1click,
         funding_source: initial_funding_source || funding_hash[:funding_source],
         purpose: initial_purpose || funding_hash[:purpose],
-        booking_id: booking.id,
-        traveler: itinerary.user.email,
-        orig_addr: trip.origin.formatted_address,
-        orig_lat: trip.origin.lat,
-        orig_lng: trip.origin.lng,
-        dest_addr: trip.destination.formatted_address,
-        dest_lat: trip.destination.lat,
-        dest_lng: trip.destination.lng,
-        agency_name: itinerary.user.booking_profile.service.agency.name,
-        service_name: itinerary.user.booking_profile.service.name,
-        booking_client_id: itinerary.user.booking_profile.external_user_id,
-        is_round_trip: trip.previous_trip.present? || trip.next_trip.present?,
+        booking_id: current_booking.id,
+        traveler: current_itinerary.user.email,
+        orig_addr: current_trip.origin.formatted_address,
+        orig_lat: current_trip.origin.lat,
+        orig_lng: current_trip.origin.lng,
+        dest_addr: current_trip.destination.formatted_address,
+        dest_lat: current_trip.destination.lat,
+        dest_lng: current_trip.destination.lng,
+        agency_name: current_itinerary.user.booking_profile.service.agency.name,
+        service_name: current_itinerary.user.booking_profile.service.name,
+        booking_client_id: current_itinerary.user.booking_profile.external_user_id,
+        is_round_trip: current_trip.previous_trip.present? || current_trip.next_trip.present?,
         sponsor: initial_sponsor || funding_hash[:sponsor],
-        companions: initial_companions || itinerary.companions,
-        ecolane_error_message: booking.ecolane_error_message,
-        pca: initial_assistant || itinerary.assistant,
-        disposition_status: trip.disposition_status,
-        note: initial_note || itinerary.note
+        companions: initial_companions || current_itinerary.companions,
+        ecolane_error_message: current_booking.ecolane_error_message,
+        pca: initial_assistant || current_itinerary.assistant,
+        disposition_status: current_trip.disposition_status,
+        note: initial_note || current_itinerary.note
       )
+      
+      Rails.logger.info "About to save snapshot: #{new_snapshot.inspect}"
       new_snapshot.save!
-    end
+      Rails.logger.info "Snapshot saved successfully"
+    end    
   end
 
   # Get a list of customers
@@ -705,31 +724,29 @@ class EcolaneAmbassador < BookingAmbassador
   ### Create OCC Trip from Ecolane Trip ###
   def occ_trip_from_ecolane_trip eco_trip
     booking_id = eco_trip.try(:with_indifferent_access).try(:[], :id)
-    itinerary = @user.itineraries.joins(:booking).find_by('bookings.confirmation = ? AND service_id = ?', booking_id, @service.id)
+    itineraries = @user.itineraries.joins(:booking).where('bookings.confirmation = ? AND service_id = ?', booking_id, @service.id)
 
-    if eco_trip.try(:with_indifferent_access).try(:[], :status) == "canceled" and itinerary and not itinerary.selected?
-      return 
+    if eco_trip.try(:with_indifferent_access).try(:[], :status) == "canceled" and itineraries.any? and itineraries.none?(&:selected?)
+      return
     end
 
-    # This Trip has already been created, just update it with new times/status etc.
-    if itinerary
-
+    # Update all existing itineraries and bookings with the same confirmation code
+    if itineraries.any?
+    itineraries.each do |itinerary|
       booking = itinerary.booking 
       booking.update(occ_booking_hash(eco_trip))
       if booking.status == "canceled"
-        trip = itinerary.trip 
+        trip = itinerary.trip
         trip.selected_itinerary = nil
         trip.save
         # For some reason itinerary.unselect doesn't work here.
       end
       booking.save
       itinerary.update!(occ_itinerary_hash_from_eco_trip(eco_trip))
-      nil
-    # This Trip needs to be added to OCC
+    end
+    # Create new trip, itinerary, and booking if none exist
     else
-      # Make the Trip
       trip = Trip.create!(occ_trip_hash(eco_trip))
-      # Make the Itinerary
       itinerary = Itinerary.new(occ_itinerary_hash_from_eco_trip(eco_trip))
       itinerary.trip = trip
       itinerary.save 
