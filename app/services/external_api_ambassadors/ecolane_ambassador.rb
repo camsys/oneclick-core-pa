@@ -705,29 +705,31 @@ class EcolaneAmbassador < BookingAmbassador
   ### Create OCC Trip from Ecolane Trip ###
   def occ_trip_from_ecolane_trip eco_trip
     booking_id = eco_trip.try(:with_indifferent_access).try(:[], :id)
-    itineraries = @user.itineraries.joins(:booking).where('bookings.confirmation = ? AND service_id = ?', booking_id, @service.id)
+    itinerary = @user.itineraries.joins(:booking).find_by('bookings.confirmation = ? AND service_id = ?', booking_id, @service.id)
 
-    if eco_trip.try(:with_indifferent_access).try(:[], :status) == "canceled" and itineraries.any? and itineraries.none?(&:selected?)
-      return
+    if eco_trip.try(:with_indifferent_access).try(:[], :status) == "canceled" and itinerary and not itinerary.selected?
+      return 
     end
 
-    # Update all existing itineraries and bookings with the same confirmation code
-    if itineraries.any?
-    itineraries.each do |itinerary|
+    # This Trip has already been created, just update it with new times/status etc.
+    if itinerary
+
       booking = itinerary.booking 
       booking.update(occ_booking_hash(eco_trip))
       if booking.status == "canceled"
-        trip = itinerary.trip
+        trip = itinerary.trip 
         trip.selected_itinerary = nil
         trip.save
         # For some reason itinerary.unselect doesn't work here.
       end
       booking.save
       itinerary.update!(occ_itinerary_hash_from_eco_trip(eco_trip))
-    end
-    # Create new trip, itinerary, and booking if none exist
+      nil
+    # This Trip needs to be added to OCC
     else
+      # Make the Trip
       trip = Trip.create!(occ_trip_hash(eco_trip))
+      # Make the Itinerary
       itinerary = Itinerary.new(occ_itinerary_hash_from_eco_trip(eco_trip))
       itinerary.trip = trip
       itinerary.save 
