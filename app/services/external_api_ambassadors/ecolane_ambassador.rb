@@ -253,7 +253,6 @@ class EcolaneAmbassador < BookingAmbassador
     ensure
       Rails.logger.info "Entering ensure block in new_order"
       
-      # Refresh the itinerary value
       current_itinerary = self.itinerary || @trip.selected_itinerary || @trip.itineraries.first
       Rails.logger.info "Current itinerary: #{current_itinerary.inspect}"
       
@@ -262,6 +261,10 @@ class EcolaneAmbassador < BookingAmbassador
       
       current_booking = self.booking
       Rails.logger.info "Current booking: #{current_booking.inspect}"
+      
+      # Explicitly grab the funding_hash from the booking's details, using symbol keys.
+      funding_hash = (current_booking.details && current_booking.details[:funding_hash]) || {}
+      Rails.logger.info "Funding hash: #{funding_hash.inspect}"
       
       Rails.logger.info "Initial funding source: #{initial_funding_source.inspect}"
       Rails.logger.info "Initial assistant: #{initial_assistant.inspect}"
@@ -305,7 +308,7 @@ class EcolaneAmbassador < BookingAmbassador
       Rails.logger.info "About to save snapshot: #{new_snapshot.inspect}"
       new_snapshot.save!
       Rails.logger.info "Snapshot saved successfully"
-    end    
+    end       
   end
 
   # Get a list of customers
