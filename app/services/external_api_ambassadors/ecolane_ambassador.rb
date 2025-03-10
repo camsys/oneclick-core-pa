@@ -242,6 +242,11 @@ class EcolaneAmbassador < BookingAmbassador
         @trip.update(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_denied])
         nil
       end
+    rescue REXML::ParseException
+      @trip.update(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_denied])
+      self.booking.update(created_in_1click: true)
+      nil
+    # Regardless of the outcome, we want to create a snapshot of the booking for FMR to use in reports (FMRPA-236)
     ensure
       new_snapshot = EcolaneBookingSnapshot.new(
         trip_id: trip.id,
