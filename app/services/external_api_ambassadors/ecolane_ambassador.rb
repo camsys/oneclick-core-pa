@@ -215,6 +215,10 @@ class EcolaneAmbassador < BookingAmbassador
       booking_details = booking.details || {}
       funding_hash = booking.details.fetch(:funding_hash, {})
 
+      Rails.logger.info "trip.inspect: #{trip.inspect}"
+      Rails.logger.info "itinerary.inspect: #{itinerary.inspect}"
+      Rails.logger.info "booking.inspect: #{booking.inspect}"
+
       if body_hash.try(:with_indifferent_access).try(:[], :status).try(:[], :result) == "success"
         confirmation = Hash.from_xml(resp.body).try(:with_indifferent_access).try(:[], :status).try(:[], :success).try(:[], :resource_id)
         eco_trip  = fetch_order(confirmation)["order"]
@@ -245,7 +249,9 @@ class EcolaneAmbassador < BookingAmbassador
       nil
     # Regardless of the outcome, we want to create a snapshot of the booking for FMR to use in reports (FMRPA-236)
     ensure
-
+      trip = itinerary.trip || self.trip
+      booking = self.booking
+      itinerary = self.itinerary
       new_snapshot = EcolaneBookingSnapshot.new(
         trip_id: trip.id,
         itinerary_id: itinerary.id,
