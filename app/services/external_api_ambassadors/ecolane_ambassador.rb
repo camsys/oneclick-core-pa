@@ -252,6 +252,8 @@ class EcolaneAmbassador < BookingAmbassador
       itinerary = self.itinerary
       booking = self.booking
       trip = itinerary.trip || self.trip
+      funding_hash = booking.details.fetch(:funding_hash, {})
+      
       new_snapshot = EcolaneBookingSnapshot.new(
         trip_id: trip.id,
         itinerary_id: itinerary.id,
