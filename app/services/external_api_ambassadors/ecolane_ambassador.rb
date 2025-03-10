@@ -210,10 +210,10 @@ class EcolaneAmbassador < BookingAmbassador
       # Initializing variables for the snapshot
       eco_trip = nil
       booking = self.booking
-      trip = itinerary.trip
+      itinerary = self.itinerary
+      trip = itinerary.trip || self.trip
       booking_details = booking.details || {}
       funding_hash = booking.details.fetch(:funding_hash, {})
-      itinerary = self.itinerary
 
       if body_hash.try(:with_indifferent_access).try(:[], :status).try(:[], :result) == "success"
         confirmation = Hash.from_xml(resp.body).try(:with_indifferent_access).try(:[], :status).try(:[], :success).try(:[], :resource_id)
