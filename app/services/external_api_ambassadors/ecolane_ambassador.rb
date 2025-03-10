@@ -221,6 +221,7 @@ class EcolaneAmbassador < BookingAmbassador
         end
   
         eco_trip = fetch_order(confirmation)["order"]
+        booking = self.booking
         booking.update(occ_booking_hash(eco_trip))
         booking.itinerary = itinerary
         booking.confirmation = confirmation
@@ -229,18 +230,19 @@ class EcolaneAmbassador < BookingAmbassador
         booking
       else
         Rails.logger.info "Failure response from Ecolane: #{resp.body}"
-        errors = body_hash.dig('status', 'error')
+        booking = self.booking
+        errors = body_hash['status']['error']
         errors = [errors] unless errors.is_a?(Array)
         error_messages = errors.map { |e| e['message'] }.join("; ")
-  
-        booking.update(ecolane_error_message: error_messages, created_in_1click: true)
+        self.booking.update(ecolane_error_message: error_messages, created_in_1click: true)
+        booking.ecolane_error_message = error_messages
+        booking.created_in_1click = true
+        booking.save
         Rails.logger.info "Booking updated with failure message(s): #{error_messages}"
         @trip.update(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_denied])
         nil
       end
     ensure
-      booking.reload # Ensure we're using the updated booking with error messages before creating the snapshot
-  
       new_snapshot = EcolaneBookingSnapshot.new(
         trip_id: trip.id,
         itinerary_id: itinerary.id,
