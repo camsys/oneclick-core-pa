@@ -253,7 +253,7 @@ class EcolaneAmbassador < BookingAmbassador
       booking = self.booking
       trip = itinerary.trip || self.trip
       funding_hash = booking.details.fetch(:funding_hash, {})
-      
+
       new_snapshot = EcolaneBookingSnapshot.new(
         trip_id: trip.id,
         itinerary_id: itinerary.id,
@@ -499,18 +499,6 @@ class EcolaneAmbassador < BookingAmbassador
       end
   
       resp
-    rescue SocketError => e
-      error_message = "Network error while calling Ecolane: #{e.message}"
-      Rails.logger.error error_message
-      raise error_message
-    rescue Timeout::Error => e
-      error_message = "Timeout error while calling Ecolane: #{e.message}"
-      Rails.logger.error error_message
-      raise error_message
-    rescue StandardError => e
-      error_message = "Error while calling Ecolane: #{e.message}"
-      Rails.logger.error error_message
-      raise error_message
     end
   end
   ###################################################################
