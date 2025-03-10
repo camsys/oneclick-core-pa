@@ -490,15 +490,12 @@ class EcolaneAmbassador < BookingAmbassador
       resp = http.start { |http| http.request(req) }
       Rails.logger.info '------Response from Ecolane---------'
       Rails.logger.info "Code: #{resp.code}"
+  
       Rails.logger.info resp.body
-  
-      unless resp.is_a?(Net::HTTPSuccess)
-        error_message = "Error from Ecolane: Code #{resp.code}, Message: #{resp.body}"
-        Rails.logger.error error_message
-        raise error_message
-      end
-  
-      resp
+      return resp
+    rescue Exception=>e
+      Rails.logger.info("Sending Error")
+      return false, {'id'=>500, 'msg'=>e.to_s}
     end
   end
   ###################################################################
