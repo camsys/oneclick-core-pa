@@ -191,6 +191,7 @@ class EcolaneAmbassador < BookingAmbassador
     url_options = "/api/order/#{system_id}?overlaps=reject"
     url = @url + url_options
     error_message_from_ecolane = nil
+  
     begin
       order = build_order
       Rails.logger.info "Order: #{order}"
@@ -211,9 +212,10 @@ class EcolaneAmbassador < BookingAmbassador
       funding_hash = booking.details.fetch(:funding_hash, {})
       itinerary = self.itinerary
   
-      if body_hash.try(:with_indifferent_access).try(:[], :status).try(:[], :result) == "success"
-        confirmation = Hash.from_xml(resp.body).try(:with_indifferent_access).try(:[], :status).try(:[], :success).try(:[], :resource_id)
+      if body_hash.dig("status", "result") == "success"
+        confirmation = body_hash.dig("status", "success", "resource_id")
         existing_booking = Booking.find_by(confirmation: confirmation)
+  
         if existing_booking
           Rails.logger.warn "Pre-existing booking found with confirmation number #{confirmation}."
         end
@@ -227,14 +229,12 @@ class EcolaneAmbassador < BookingAmbassador
         booking
       else
         Rails.logger.info "Failure response from Ecolane: #{resp.body}"
-        # Parse the XML response using Nokogiri to extract the error message
-        doc = Nokogiri::XML(resp.body)
-        error_message_from_ecolane = doc.at_xpath("//error/message")&.text
-        Rails.logger.info "Extracted error message: #{error_message_from_ecolane}"
-        booking = self.booking
-        # Save the specific Ecolane error message in the booking
+  
+        # Extract error message from the XML response
+        error_message_from_ecolane = body_hash.dig("status", "error", "message")
+  
         booking.update(ecolane_error_message: error_message_from_ecolane, created_in_1click: true)
-        Rails.logger.info "Booking updated with error message: #{booking.ecolane_error_message}"
+        Rails.logger.info "Booking updated with failure message: #{error_message_from_ecolane}"
         @trip.update(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_denied])
         nil
       end
@@ -248,21 +248,12 @@ class EcolaneAmbassador < BookingAmbassador
       Rails.logger.info "Entering ensure block in new_order"
   
       current_itinerary = self.itinerary || @trip.selected_itinerary || @trip.itineraries.first
-      Rails.logger.info "Current itinerary: #{current_itinerary.inspect}"
-  
       current_trip = current_itinerary.trip
-      Rails.logger.info "Current trip: #{current_trip.inspect}"
-  
       current_booking = self.booking.reload
-      Rails.logger.info "Current booking: #{current_booking.inspect}"
   
-      funding_hash = (current_booking.details && current_booking.details[:funding_hash]) || {}
-      Rails.logger.info "Funding hash: #{funding_hash.inspect}"
+      funding_hash = current_booking.details[:funding_hash] || {}
   
-      Rails.logger.info "Initial funding source: #{initial_funding_source.inspect}"
-      Rails.logger.info "Initial assistant: #{initial_assistant.inspect}"
-      Rails.logger.info "Initial companions: #{initial_companions.inspect}"
-  
+      # Use the extracted error message from the XML response
       final_error_msg = current_booking.ecolane_error_message.presence || error_message_from_ecolane
   
       new_snapshot = EcolaneBookingSnapshot.new(
@@ -305,6 +296,7 @@ class EcolaneAmbassador < BookingAmbassador
       Rails.logger.info "Snapshot saved successfully"
     end
   end
+  
   
   
 
