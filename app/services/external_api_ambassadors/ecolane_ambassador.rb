@@ -249,9 +249,9 @@ class EcolaneAmbassador < BookingAmbassador
       nil
     # Regardless of the outcome, we want to create a snapshot of the booking for FMR to use in reports (FMRPA-236)
     ensure
-      trip = itinerary.trip || self.trip
-      booking = self.booking
       itinerary = self.itinerary
+      booking = self.booking
+      trip = itinerary.trip || self.trip
       new_snapshot = EcolaneBookingSnapshot.new(
         trip_id: trip.id,
         itinerary_id: itinerary.id,
