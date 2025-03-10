@@ -213,7 +213,7 @@ class EcolaneAmbassador < BookingAmbassador
   
       if body_hash.try(:with_indifferent_access).try(:[], :status).try(:[], :result) == "success"
         confirmation = Hash.from_xml(resp.body).try(:with_indifferent_access).try(:[], :status).try(:[], :success).try(:[], :resource_id)
-        
+  
         existing_booking = Booking.find_by(confirmation: confirmation)
         if existing_booking
           Rails.logger.warn "Pre-existing booking found with confirmation number #{confirmation}. Existing booking ID: #{existing_booking.id}, Itinerary ID: #{existing_booking.itinerary_id}"
@@ -249,7 +249,8 @@ class EcolaneAmbassador < BookingAmbassador
       nil
     rescue StandardError => e
       Rails.logger.error "General error while calling Ecolane: #{e.message}"
-      raise "General error while calling Ecolane: #{e.message}"
+      # Instead of raising the error, we simply log and return nil
+      nil
     ensure
       Rails.logger.info "Entering ensure block in new_order"
       
@@ -262,7 +263,6 @@ class EcolaneAmbassador < BookingAmbassador
       current_booking = self.booking
       Rails.logger.info "Current booking: #{current_booking.inspect}"
       
-      # Explicitly grab the funding_hash from the booking's details, using symbol keys.
       funding_hash = (current_booking.details && current_booking.details[:funding_hash]) || {}
       Rails.logger.info "Funding hash: #{funding_hash.inspect}"
       
@@ -310,6 +310,7 @@ class EcolaneAmbassador < BookingAmbassador
       Rails.logger.info "Snapshot saved successfully"
     end       
   end
+  
 
   # Get a list of customers
   def search_for_customers terms={}
