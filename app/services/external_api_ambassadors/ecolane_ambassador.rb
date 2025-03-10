@@ -194,10 +194,8 @@ class EcolaneAmbassador < BookingAmbassador
       order = build_order
       Rails.logger.info "Order: #{order}"
       resp = send_request(url, 'POST', order)
-      # NOTE: Ecolane uses both JSON and XML for their responses, and failed responses are formatted as JSON.
       body_hash = Hash.from_xml(resp.body)
   
-      # Getting the initial values from the order for the snapshot
       order_hash = Hash.from_xml(order)
       initial_note = order_hash.dig("order", "pickup", "note")
       initial_assistant = order_hash.dig("order", "assistant")
@@ -206,7 +204,6 @@ class EcolaneAmbassador < BookingAmbassador
       initial_purpose = order_hash.dig("order", "funding", "purpose")
       initial_sponsor = order_hash.dig("order", "funding", "sponsor")
   
-      # Initializing variables for the snapshot
       eco_trip = nil
       booking = self.booking
       trip = itinerary.trip
@@ -215,9 +212,15 @@ class EcolaneAmbassador < BookingAmbassador
       itinerary = self.itinerary
   
       if body_hash.try(:with_indifferent_access).try(:[], :status).try(:[], :result) == "success"
-        confirmation = Hash.from_xml(resp.body).try(:with_indifferent_access).try(:[], :status).try(:[], :success).try(:[], :resource_id)
+        confirmation = body_hash.dig(:status, :success, :resource_id)
+        
+        existing_booking = Booking.find_by(confirmation: confirmation)
+        if existing_booking
+          Rails.logger.warn "Pre-existing booking found with confirmation number #{confirmation}. Existing booking ID: #{existing_booking.id}, Itinerary ID: #{existing_booking.itinerary_id}"
+          Rails.logger.info "Existing trip ID: #{existing_booking.itinerary.trip.id}, Origin: #{existing_booking.itinerary.trip.origin.formatted_address}, Destination: #{existing_booking.itinerary.trip.destination.formatted_address}"
+        end
+  
         eco_trip = fetch_order(confirmation)["order"]
-        booking = self.booking
         booking.update(occ_booking_hash(eco_trip))
         booking.itinerary = itinerary
         booking.confirmation = confirmation
@@ -226,29 +229,18 @@ class EcolaneAmbassador < BookingAmbassador
         booking
       else
         Rails.logger.info "Failure response from Ecolane: #{resp.body}"
-        booking = self.booking
-        errors = body_hash['status']['error']
+        errors = body_hash.dig('status', 'error')
         errors = [errors] unless errors.is_a?(Array)
         error_messages = errors.map { |e| e['message'] }.join("; ")
-        Rails.logger.info "Extracted error message: #{body_hash['status']['error']['message']}"
-        self.booking.update(ecolane_error_message: error_messages, created_in_1click: true)
-        booking.ecolane_error_message = error_messages
-        booking.created_in_1click = true
-        booking.save
+  
+        booking.update(ecolane_error_message: error_messages, created_in_1click: true)
         Rails.logger.info "Booking updated with failure message(s): #{error_messages}"
         @trip.update(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_denied])
         nil
       end
-    rescue REXML::ParseException
-      @trip.update(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_denied])
-      self.booking.update(created_in_1click: true)
-      nil
-    rescue StandardError => e
-      Rails.logger.error "General error while calling Ecolane: #{e.message}"
-      nil
     ensure
-      # Force reload booking so that the saved error message is current
-      booking = self.booking.reload
+      booking.reload # Ensure we're using the updated booking with error messages before creating the snapshot
+  
       new_snapshot = EcolaneBookingSnapshot.new(
         trip_id: trip.id,
         itinerary_id: itinerary.id,
@@ -286,8 +278,6 @@ class EcolaneAmbassador < BookingAmbassador
       new_snapshot.save!
     end
   end
-  
-  
 
   # Get a list of customers
   def search_for_customers terms={}
