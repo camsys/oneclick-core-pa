@@ -505,6 +505,7 @@ class TravelPattern < ApplicationRecord
         service_schedule = travel_pattern_service_schedule.service_schedule
         service_schedule.service_sub_schedules.any? do |sub_schedule|
           valid_start_time = sub_schedule.start_time <= trip_start
+          valid_end_time = sub_schedule.end_time >= trip_end
           valid_start_time && valid_end_time
         end
       end
