@@ -386,21 +386,21 @@ class TravelPattern < ApplicationRecord
       :date
     ]
     query = self.all
-  
+
     Rails.logger.info "Initial query: #{query.to_sql}"
-  
+
     # First filter by all provided params except origin and destination
     filters.each do |filter|
       method_name = ("with_" + filter.to_s).to_sym
       param = query_params[filter]
-  
+
       if param
-        Rails.logger.info "Applying filter: #{filter} with param: #{param.inspect}"
+        Rails.logger.info "Applying filter: #{filter} with param: #{param}"
         query = query.send(method_name, param)
         Rails.logger.info "Query after applying #{filter}: #{query.to_sql}"
       end
     end
-  
+
     # Handle origin and destination together
     if query_params[:origin] && query_params[:destination]
       Rails.logger.info "Applying with_origin_and_destination with origin: #{query_params[:origin]} and destination: #{query_params[:destination]}"
@@ -415,58 +415,16 @@ class TravelPattern < ApplicationRecord
         query = query.with_destination(query_params[:destination])
       end
     end
-  
+
     Rails.logger.info "Query before filtering by time: #{query.to_sql}"
-  
-    # Convert trip times to integers
-    trip_start = query_params[:start_time].to_i
-    trip_end = query_params[:end_time].to_i
-  
-    Rails.logger.info "Filtering by time - Start Time: #{trip_start}, End Time: #{trip_end}"
-  
-    # Filter by time
-    valid_travel_patterns = self.filter_by_time(query.distinct, trip_start, trip_end)
-  
-    Rails.logger.info "Travel Patterns after time filtering: #{valid_travel_patterns.map(&:id)}"
-  
-    # Ensure the booking window allows the trip
-    valid_patterns = valid_travel_patterns.select do |pattern|
-      booking_window = pattern.booking_window
-      now = Time.current
-      today = now.to_date
-      current_hour = now.hour
-  
-      Rails.logger.info "Checking booking window for pattern ID: #{pattern.id}"
-      Rails.logger.info "Booking Window: ID=#{booking_window.id}, min_days_notice=#{booking_window.minimum_days_notice}, max_days_notice=#{booking_window.maximum_days_notice}, cutoff_hour=#{booking_window.minimum_notice_cutoff_hour}"
-  
-      # Calculate the earliest and latest possible booking dates
-      earliest_booking = booking_window.earliest_booking.to_date
-      latest_booking = booking_window.latest_booking.to_date
-  
-      Rails.logger.info "Current Date: #{today}, Earliest Booking: #{earliest_booking}, Latest Booking: #{latest_booking}"
-  
-      # Check if the trip date falls within the booking window
-      trip_date_valid = earliest_booking <= today && today <= latest_booking
-  
-      # Ensure we are past the cutoff hour if minimum notice applies
-      if booking_window.minimum_days_notice > 0 && today == earliest_booking
-        trip_date_valid &&= current_hour < booking_window.minimum_notice_cutoff_hour
-        Rails.logger.info "Checking cutoff hour: #{current_hour} < #{booking_window.minimum_notice_cutoff_hour} => #{trip_date_valid}"
-      end
-  
-      # Final validation
-      booking_valid = trip_date_valid
-  
-      Rails.logger.info "Pattern ID: #{pattern.id} - Booking Window Valid? #{booking_valid}"
-  
-      booking_valid
-    end
-  
-    Rails.logger.info "Final valid patterns after booking window check: #{valid_patterns.map(&:id)}"
-  
-    valid_patterns
+
+    # Filter by time if start_time and end_time are provided
+    travel_patterns = self.filter_by_time(query.distinct, query_params[:start_time], query_params[:end_time])
+
+    Rails.logger.info "Final travel patterns: #{travel_patterns.map(&:id)}"
+
+    travel_patterns
   end
-  
 
   def self.to_api_response(travel_patterns, service, valid_from = nil, valid_until = nil)
     business_days = service.business_days
@@ -547,7 +505,6 @@ class TravelPattern < ApplicationRecord
         service_schedule = travel_pattern_service_schedule.service_schedule
         service_schedule.service_sub_schedules.any? do |sub_schedule|
           valid_start_time = sub_schedule.start_time <= trip_start
-          valid_end_time = sub_schedule.end_time >= trip_end
           valid_start_time && valid_end_time
         end
       end
