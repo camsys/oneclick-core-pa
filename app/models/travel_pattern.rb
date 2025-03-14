@@ -419,6 +419,16 @@ class TravelPattern < ApplicationRecord
       Rails.logger.info "  - 💰 Funding Sources: #{tp.funding_sources.pluck(:name).join(', ')}"
       Rails.logger.info "  - 📆 Service Schedules: #{service_schedules.map(&:name)}"
   
+      trip_date = query_params[:date]
+      trip_time = query_params[:start_time].to_i if query_params[:start_time]
+  
+      if trip_date.nil?
+        Rails.logger.warn "⚠️ No trip date provided! Skipping time-based filtering for Travel Pattern ##{tp.id}"
+        valid_patterns << tp
+        next
+      end
+  
+      trip_day = trip_date.wday
       valid_service_schedule = false
   
       service_schedules.each do |ss|
@@ -428,10 +438,7 @@ class TravelPattern < ApplicationRecord
         Rails.logger.info "      - 📅 Sub-schedules: #{sub_schedules.map { |ssub| "Day: #{ssub.day}, Time: #{ssub.start_time}-#{ssub.end_time}" }}"
   
         sub_schedules.each do |ssub|
-          trip_day = query_params[:date].wday # Get the weekday (0 = Sunday, 6 = Saturday)
-          trip_time = query_params[:start_time].to_i # Convert trip time to integer
-  
-          if ssub.day == trip_day && (trip_time >= ssub.start_time && trip_time <= ssub.end_time)
+          if ssub.day == trip_day && (trip_time.nil? || (trip_time >= ssub.start_time && trip_time <= ssub.end_time))
             valid_service_schedule = true
             Rails.logger.info "      ✅ Matches trip day/time (Day: #{trip_day}, Time: #{trip_time})"
           else
