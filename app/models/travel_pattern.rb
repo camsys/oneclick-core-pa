@@ -378,13 +378,7 @@ class TravelPattern < ApplicationRecord
   # @option query_params [String, Integer] :start_time The starting time of a potential trip represented  as number of seconds since midnight.
   # @option query_params [String, Integer] :end_time The ending time of a potential trip represented  as number of seconds since midnight.
   def self.available_for(query_params)
-    filters = [
-      :agency, 
-      :service, 
-      :purpose, :purpose_id, 
-      :funding_sources, :funding_source_ids, 
-      :date
-    ]
+    filters = [:agency, :service, :purpose, :purpose_id, :funding_sources, :funding_source_ids, :date]
     query = self.all
   
     Rails.logger.info "🟢 Initial query: #{query.to_sql}"
@@ -400,7 +394,6 @@ class TravelPattern < ApplicationRecord
       end
     end
   
-    # Handle origin and destination filtering
     if query_params[:origin] && query_params[:destination]
       Rails.logger.info "🔵 Filtering by origin and destination"
       query = query.with_origin_and_destination(query_params[:origin], query_params[:destination])
@@ -408,38 +401,56 @@ class TravelPattern < ApplicationRecord
   
     Rails.logger.info "🟢 Query before filtering by time: #{query.to_sql}"
   
-    # Time filtering
-    travel_patterns = self.filter_by_time(query.distinct, query_params[:start_time], query_params[:end_time])
+    travel_patterns = query.distinct
   
-    Rails.logger.info "🟢 Travel patterns after time filtering: #{travel_patterns.map(&:id)}"
+    Rails.logger.info "🟢 Travel patterns before time check: #{travel_patterns.map(&:id)}"
   
-    # **LOG DETAILS FOR EACH TRAVEL PATTERN**
+    valid_patterns = []
+  
     travel_patterns.each do |tp|
       bw = tp.booking_window
+      service_schedules = tp.service_schedules
+  
       Rails.logger.info "🔍 Checking Travel Pattern ##{tp.id}: #{tp.name}"
       Rails.logger.info "  - 🚍 Origin Zone ID: #{tp.origin_zone_id}, Destination Zone ID: #{tp.destination_zone_id}"
       Rails.logger.info "  - ⏳ Booking Window: Min Days: #{bw.minimum_days_notice}, Max Days: #{bw.maximum_days_notice}"
       Rails.logger.info "  - ⏰ Cutoff Hour: #{bw.minimum_notice_cutoff_hour}"
       Rails.logger.info "  - 📅 Earliest Booking: #{bw.earliest_booking}, Latest Booking: #{bw.latest_booking}"
       Rails.logger.info "  - 💰 Funding Sources: #{tp.funding_sources.pluck(:name).join(', ')}"
-    end
+      Rails.logger.info "  - 📆 Service Schedules: #{service_schedules.map(&:name)}"
   
-    # **LOG WHICH FUNDING SOURCE IS BEING SELECTED**
-    selected_funding_sources = query_params[:funding_sources]
-    if selected_funding_sources.present?
-      Rails.logger.info "🔍 Checking if travel patterns match the requested funding sources: #{selected_funding_sources.map(&:name)}"
-      travel_patterns.each do |tp|
-        matching_funding = tp.funding_sources & selected_funding_sources
-        if matching_funding.any?
-          Rails.logger.info "✅ Travel Pattern ##{tp.id} has a matching funding source: #{matching_funding.map(&:name)}"
-        else
-          Rails.logger.info "❌ Travel Pattern ##{tp.id} does NOT match requested funding sources."
+      valid_service_schedule = false
+  
+      service_schedules.each do |ss|
+        sub_schedules = ss.service_sub_schedules
+  
+        Rails.logger.info "    - 📆 Service Schedule: #{ss.name} (ID: #{ss.id})"
+        Rails.logger.info "      - 📅 Sub-schedules: #{sub_schedules.map { |ssub| "Day: #{ssub.day}, Time: #{ssub.start_time}-#{ssub.end_time}" }}"
+  
+        sub_schedules.each do |ssub|
+          trip_day = query_params[:date].wday # Get the weekday (0 = Sunday, 6 = Saturday)
+          trip_time = query_params[:start_time].to_i # Convert trip time to integer
+  
+          if ssub.day == trip_day && (trip_time >= ssub.start_time && trip_time <= ssub.end_time)
+            valid_service_schedule = true
+            Rails.logger.info "      ✅ Matches trip day/time (Day: #{trip_day}, Time: #{trip_time})"
+          else
+            Rails.logger.info "      ❌ Does NOT match trip day/time (Day: #{trip_day}, Time: #{trip_time})"
+          end
         end
+      end
+  
+      if valid_service_schedule
+        valid_patterns << tp
+      else
+        Rails.logger.info "❌ Travel Pattern ##{tp.id} REJECTED: No matching service schedule for trip date/time"
       end
     end
   
-    travel_patterns
-  end
+    Rails.logger.info "🟢 Final valid travel patterns after time/service schedule check: #{valid_patterns.map(&:id)}"
+  
+    valid_patterns
+  end  
   
 
   def self.to_api_response(travel_patterns, service, valid_from = nil, valid_until = nil)
