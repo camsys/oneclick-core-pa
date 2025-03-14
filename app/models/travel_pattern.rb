@@ -378,7 +378,13 @@ class TravelPattern < ApplicationRecord
   # @option query_params [String, Integer] :start_time The starting time of a potential trip represented  as number of seconds since midnight.
   # @option query_params [String, Integer] :end_time The ending time of a potential trip represented  as number of seconds since midnight.
   def self.available_for(query_params)
-    filters = [:agency, :service, :purpose, :purpose_id, :funding_sources, :funding_source_ids, :date]
+    filters = [
+      :agency, 
+      :service, 
+      :purpose, :purpose_id, 
+      :funding_sources, :funding_source_ids, 
+      :date
+    ]
     query = self.all
   
     Rails.logger.info "Initial query: #{query.to_sql}"
@@ -395,7 +401,7 @@ class TravelPattern < ApplicationRecord
       end
     end
   
-    # Handle origin and destination
+    # Handle origin and destination filtering
     if query_params[:origin] && query_params[:destination]
       Rails.logger.info "Applying with_origin_and_destination with origin: #{query_params[:origin]} and destination: #{query_params[:destination]}"
       query = query.with_origin_and_destination(query_params[:origin], query_params[:destination])
@@ -412,17 +418,53 @@ class TravelPattern < ApplicationRecord
   
     Rails.logger.info "Query before filtering by time: #{query.to_sql}"
   
-    # Handle round trips: Ensure the travel pattern supports both legs of the trip
-    if query_params[:start_time] && query_params[:end_time]
-      Rails.logger.info "Checking travel patterns for both outbound and return trip times"
-      valid_patterns = self.filter_by_time(query.distinct, query_params[:start_time], query_params[:end_time])
-    else
-      valid_patterns = query.distinct
+    # Convert start/end times to integers if they exist
+    trip_start = query_params[:start_time]&.to_i
+    trip_end = query_params[:end_time]&.to_i
+  
+    # Get travel patterns
+    travel_patterns = self.filter_by_time(query.distinct, trip_start, trip_end)
+    
+    Rails.logger.info "Final valid travel patterns after time filtering: #{travel_patterns.map(&:id)}"
+  
+    # Validate booking window against trip start and end times
+    valid_patterns = travel_patterns.select do |pattern|
+      bw = pattern.booking_window
+      next unless bw
+  
+      Rails.logger.info "Checking booking window for Travel Pattern #{pattern.id}: #{pattern.name}"
+      Rails.logger.info "  -> Booking Window: Min Notice: #{bw.minimum_days_notice}, Max Notice: #{bw.maximum_days_notice}"
+      Rails.logger.info "  -> Booking Window Cutoff Hour: #{bw.minimum_notice_cutoff_hour}"
+      Rails.logger.info "  -> Earliest Booking: #{bw.earliest_booking}, Latest Booking: #{bw.latest_booking}"
+  
+      valid_start = trip_start >= bw.earliest_booking.to_i && trip_start <= bw.latest_booking.to_i
+      valid_end = trip_end >= bw.earliest_booking.to_i && trip_end <= bw.latest_booking.to_i
+  
+      Rails.logger.info "  -> Start Time Valid? #{valid_start} (Trip Start: #{trip_start})"
+      Rails.logger.info "  -> End Time Valid? #{valid_end} (Trip End: #{trip_end})"
+  
+      valid_start && valid_end
     end
   
-    Rails.logger.info "Final valid travel patterns: #{valid_patterns.map(&:id)}"
-    valid_patterns
-  end  
+    Rails.logger.info "Valid Travel Patterns after booking window check: #{valid_patterns.map { |p| { id: p.id, name: p.name } }}"
+  
+    # Ensure funding source aligns with chosen travel pattern
+    selected_patterns = valid_patterns.select do |pattern|
+      funding_match = pattern.funding_sources.any? { |fs| query_params[:funding_sources]&.include?(fs) }
+  
+      Rails.logger.info "Checking funding for Travel Pattern #{pattern.id}: #{pattern.name}"
+      Rails.logger.info "  -> Available Funding Sources: #{pattern.funding_sources.pluck(:name)}"
+      Rails.logger.info "  -> Required Funding Sources: #{query_params[:funding_sources]&.map(&:name)}"
+      Rails.logger.info "  -> Funding Match? #{funding_match}"
+  
+      funding_match
+    end
+  
+    Rails.logger.info "Final selected travel patterns: #{selected_patterns.map { |p| { id: p.id, name: p.name, funding: p.funding_sources.pluck(:name) } }}"
+  
+    selected_patterns
+  end
+  
 
   def self.to_api_response(travel_patterns, service, valid_from = nil, valid_until = nil)
     business_days = service.business_days
