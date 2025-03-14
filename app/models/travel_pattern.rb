@@ -378,30 +378,24 @@ class TravelPattern < ApplicationRecord
   # @option query_params [String, Integer] :start_time The starting time of a potential trip represented  as number of seconds since midnight.
   # @option query_params [String, Integer] :end_time The ending time of a potential trip represented  as number of seconds since midnight.
   def self.available_for(query_params)
-    filters = [
-      :agency, 
-      :service, 
-      :purpose, :purpose_id, 
-      :funding_sources, :funding_source_ids, 
-      :date
-    ]
+    filters = [:agency, :service, :purpose, :purpose_id, :funding_sources, :funding_source_ids, :date]
     query = self.all
-
+  
     Rails.logger.info "Initial query: #{query.to_sql}"
-
-    # First filter by all provided params except origin and destination
+  
+    # Apply filters
     filters.each do |filter|
       method_name = ("with_" + filter.to_s).to_sym
       param = query_params[filter]
-
+  
       if param
         Rails.logger.info "Applying filter: #{filter} with param: #{param}"
         query = query.send(method_name, param)
         Rails.logger.info "Query after applying #{filter}: #{query.to_sql}"
       end
     end
-
-    # Handle origin and destination together
+  
+    # Handle origin and destination
     if query_params[:origin] && query_params[:destination]
       Rails.logger.info "Applying with_origin_and_destination with origin: #{query_params[:origin]} and destination: #{query_params[:destination]}"
       query = query.with_origin_and_destination(query_params[:origin], query_params[:destination])
@@ -415,16 +409,20 @@ class TravelPattern < ApplicationRecord
         query = query.with_destination(query_params[:destination])
       end
     end
-
+  
     Rails.logger.info "Query before filtering by time: #{query.to_sql}"
-
-    # Filter by time if start_time and end_time are provided
-    travel_patterns = self.filter_by_time(query.distinct, query_params[:start_time], query_params[:end_time])
-
-    Rails.logger.info "Final travel patterns: #{travel_patterns.map(&:id)}"
-
-    travel_patterns
-  end
+  
+    # Handle round trips: Ensure the travel pattern supports both legs of the trip
+    if query_params[:start_time] && query_params[:end_time]
+      Rails.logger.info "Checking travel patterns for both outbound and return trip times"
+      valid_patterns = self.filter_by_time(query.distinct, query_params[:start_time], query_params[:end_time])
+    else
+      valid_patterns = query.distinct
+    end
+  
+    Rails.logger.info "Final valid travel patterns: #{valid_patterns.map(&:id)}"
+    valid_patterns
+  end  
 
   def self.to_api_response(travel_patterns, service, valid_from = nil, valid_until = nil)
     business_days = service.business_days
@@ -482,33 +480,48 @@ class TravelPattern < ApplicationRecord
     return travel_pattern_query unless trip_start
     trip_start = trip_start.to_i
     trip_end = (trip_end || trip_start).to_i
-
+  
     Rails.logger.info("Filtering through Travel Patterns that have a Service Schedule running from: #{trip_start / 1.hour}:#{trip_start % 1.hour / 1.minute}, to: #{trip_end / 1.hour}:#{trip_end % 1.hour / 1.minute}")
-    # Eager loading will ensure that all the previous filters will still apply to the nested relations
     travel_patterns = travel_pattern_query.eager_load(travel_pattern_service_schedules: { service_schedule: [:service_schedule_type, :service_sub_schedules] })
     Rails.logger.info("Travel Patterns before time filtering: #{travel_patterns.map(&:id)}")
-
+  
     valid_patterns = travel_patterns.select do |travel_pattern|
       schedules = travel_pattern.schedules_by_type
-
-      # If there are reduced schedules, then we don't need to check any other schedules
+  
+      Rails.logger.info("Checking Travel Pattern ##{travel_pattern.id}")
+  
+      # Prioritize reduced schedules, otherwise use standard ones
       if schedules[:reduced_service_schedules].present?
-        Rails.logger.info("Travel Pattern ##{travel_pattern.id} has matching reduced service schedules")
+        Rails.logger.info("Travel Pattern ##{travel_pattern.id} has reduced service schedules")
         schedules = schedules[:reduced_service_schedules]
       else
-        Rails.logger.info("Travel Pattern ##{travel_pattern.id} does not have matching calendar date schedules, checking other schedule types")
+        Rails.logger.info("Travel Pattern ##{travel_pattern.id} using weekly and extra service schedules")
         schedules = schedules[:weekly_schedules] + schedules[:extra_service_schedules]
       end
-
-      # Grab any valid schedules
+  
+      # Ensure that both outbound and return trip times are valid
       schedules.any? do |travel_pattern_service_schedule|
         service_schedule = travel_pattern_service_schedule.service_schedule
+  
         service_schedule.service_sub_schedules.any? do |sub_schedule|
+          if sub_schedule.start_time.nil? || sub_schedule.end_time.nil?
+            Rails.logger.warn("Sub Schedule ##{sub_schedule.id} for Service Schedule ##{service_schedule.id} has NIL start_time or end_time!")
+            next false
+          end
+  
           valid_start_time = sub_schedule.start_time <= trip_start
+          valid_end_time = sub_schedule.end_time >= trip_end
+  
+          Rails.logger.info("Checking Sub Schedule ##{sub_schedule.id}: Start Time Valid? #{valid_start_time}, End Time Valid? #{valid_end_time}")
+  
           valid_start_time && valid_end_time
         end
       end
-    end # end travel_patterns.select
-  end # end filter_by_time
+    end
+  
+    Rails.logger.info "Final valid patterns after filtering: #{valid_patterns.map(&:id)}"
+    valid_patterns
+  end
+  # end filter_by_time
 
 end
