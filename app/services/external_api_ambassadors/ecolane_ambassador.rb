@@ -1014,11 +1014,10 @@ class EcolaneAmbassador < BookingAmbassador
       destination: destination,
       # TODO: Commenting out this newer workflow until it can be tested more.
       # Putting it back to match earlier workflow for OCC-1075.
-      #date: trip_date,
-      #start_time: start_time,
-      #end_time: end_time,
+      date: trip_date,         # Now included
+      start_time: start_time,  # Now included (e.g. 30600 for 8:30 AM)
+      end_time: end_time       # Now included (e.g. 61200 for 5:00 PM)
     }
-
     # TODO: Commenting out this newer workflow until it can be tested more.
     # Putting it back to match earlier workflow for OCC-1075.
     verified_funding_sources = Set.new(
