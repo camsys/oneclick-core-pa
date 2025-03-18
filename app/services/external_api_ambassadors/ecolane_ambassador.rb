@@ -194,8 +194,11 @@ class EcolaneAmbassador < BookingAmbassador
       order = build_order
       Rails.logger.info "Order: #{order}"
       resp = send_request(url, 'POST', order)
+      # NOTE: this seems like overkill, but Ecolane uses both JSON and
+      # ...XML for their responses, and failed responses are formatted as JSON
       body_hash = Hash.from_xml(resp.body)
-  
+
+      # Getting the initial values from the order for the snapshot
       order_hash = Hash.from_xml(order)
       initial_note = order_hash.dig("order", "pickup", "note")
       initial_assistant = order_hash.dig("order", "assistant")
@@ -203,24 +206,22 @@ class EcolaneAmbassador < BookingAmbassador
       initial_funding_source = order_hash.dig("order", "funding", "funding_source")
       initial_purpose = order_hash.dig("order", "funding", "purpose")
       initial_sponsor = order_hash.dig("order", "funding", "sponsor")
-  
+
+      # Initializing variables for the snapshot
       eco_trip = nil
       booking = self.booking
-      trip = itinerary.trip
+      itinerary = self.itinerary
+      trip = itinerary.trip || self.trip
       booking_details = booking.details || {}
       funding_hash = booking.details.fetch(:funding_hash, {})
-      itinerary = self.itinerary
-  
+
+      Rails.logger.info "trip.inspect: #{trip.inspect}"
+      Rails.logger.info "itinerary.inspect: #{itinerary.inspect}"
+      Rails.logger.info "booking.inspect: #{booking.inspect}"
+
       if body_hash.try(:with_indifferent_access).try(:[], :status).try(:[], :result) == "success"
         confirmation = Hash.from_xml(resp.body).try(:with_indifferent_access).try(:[], :status).try(:[], :success).try(:[], :resource_id)
-        
-        existing_booking = Booking.find_by(confirmation: confirmation)
-        if existing_booking
-          Rails.logger.warn "Pre-existing booking found with confirmation number #{confirmation}. Existing booking ID: #{existing_booking.id}, Itinerary ID: #{existing_booking.itinerary_id}"
-          Rails.logger.info "Existing trip ID: #{existing_booking.itinerary.trip.id}, Origin: #{existing_booking.itinerary.trip.origin.formatted_address}, Destination: #{existing_booking.itinerary.trip.destination.formatted_address}"
-        end
-  
-        eco_trip = fetch_order(confirmation)["order"]
+        eco_trip  = fetch_order(confirmation)["order"]
         booking = self.booking
         booking.update(occ_booking_hash(eco_trip))
         booking.itinerary = itinerary
@@ -242,15 +243,17 @@ class EcolaneAmbassador < BookingAmbassador
         @trip.update(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_denied])
         nil
       end
-    rescue REXML::ParseException => e
-      Rails.logger.error "XML Parse error while calling Ecolane: #{e.message}"
+    rescue REXML::ParseException
       @trip.update(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_denied])
       self.booking.update(created_in_1click: true)
       nil
-    rescue StandardError => e
-      Rails.logger.error "General error while calling Ecolane: #{e.message}"
-      raise "General error while calling Ecolane: #{e.message}"
+    # Regardless of the outcome, we want to create a snapshot of the booking for FMR to use in reports (FMRPA-236)
     ensure
+      itinerary = self.itinerary
+      booking = self.booking
+      trip = itinerary.trip || self.trip
+      funding_hash = booking.details.fetch(:funding_hash, {})
+
       new_snapshot = EcolaneBookingSnapshot.new(
         trip_id: trip.id,
         itinerary_id: itinerary.id,
@@ -487,27 +490,12 @@ class EcolaneAmbassador < BookingAmbassador
       resp = http.start { |http| http.request(req) }
       Rails.logger.info '------Response from Ecolane---------'
       Rails.logger.info "Code: #{resp.code}"
+  
       Rails.logger.info resp.body
-  
-      unless resp.is_a?(Net::HTTPSuccess)
-        error_message = "Error from Ecolane: Code #{resp.code}, Message: #{resp.body}"
-        Rails.logger.error error_message
-        raise error_message
-      end
-  
-      resp
-    rescue SocketError => e
-      error_message = "Network error while calling Ecolane: #{e.message}"
-      Rails.logger.error error_message
-      raise error_message
-    rescue Timeout::Error => e
-      error_message = "Timeout error while calling Ecolane: #{e.message}"
-      Rails.logger.error error_message
-      raise error_message
-    rescue StandardError => e
-      error_message = "Error while calling Ecolane: #{e.message}"
-      Rails.logger.error error_message
-      raise error_message
+      return resp
+    rescue Exception=>e
+      Rails.logger.info("Sending Error")
+      return false, {'id'=>500, 'msg'=>e.to_s}
     end
   end
   ###################################################################
@@ -1026,11 +1014,10 @@ class EcolaneAmbassador < BookingAmbassador
       destination: destination,
       # TODO: Commenting out this newer workflow until it can be tested more.
       # Putting it back to match earlier workflow for OCC-1075.
-      #date: trip_date,
-      #start_time: start_time,
-      #end_time: end_time,
+      date: trip_date,         # Now included
+      start_time: start_time,  # Now included (e.g. 30600 for 8:30 AM)
+      end_time: end_time       # Now included (e.g. 61200 for 5:00 PM)
     }
-
     # TODO: Commenting out this newer workflow until it can be tested more.
     # Putting it back to match earlier workflow for OCC-1075.
     verified_funding_sources = Set.new(
