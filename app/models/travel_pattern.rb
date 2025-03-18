@@ -395,9 +395,9 @@ class TravelPattern < ApplicationRecord
       param = query_params[filter]
   
       if param
-        Rails.logger.info "🔵 Applying filter: #{filter} with param: #{param.inspect || 'nil'}"
+        Rails.logger.info "Applying filter: #{filter} with param: #{param.inspect || 'nil'}"
         query = query.send(method_name, param)
-        Rails.logger.info "🔵 Query after applying #{filter}: #{query.to_sql || 'nil'}"
+        Rails.logger.info "Query after applying #{filter}: #{query.to_sql || 'nil'}"
       end
     end
   
@@ -406,22 +406,22 @@ class TravelPattern < ApplicationRecord
     destination = query_params[:destination] || {}
   
     if origin.any? && destination.any?
-      Rails.logger.info "🔵 Applying with_origin_and_destination with origin: #{origin.inspect || 'nil'} and destination: #{destination.inspect || 'nil'}"
+      Rails.logger.info "Applying with_origin_and_destination with origin: #{origin.inspect || 'nil'} and destination: #{destination.inspect || 'nil'}"
       query = query.with_origin_and_destination(origin, destination)
     elsif origin.any?
-      Rails.logger.info "🔵 Applying with_origin with origin: #{origin.inspect || 'nil'}"
+      Rails.logger.info "Applying with_origin with origin: #{origin.inspect || 'nil'}"
       query = query.with_origin(origin)
     elsif destination.any?
-      Rails.logger.info "🔵 Applying with_destination with destination: #{destination.inspect || 'nil'}"
+      Rails.logger.info "Applying with_destination with destination: #{destination.inspect || 'nil'}"
       query = query.with_destination(destination)
     end
   
-    Rails.logger.info "🟢 Query before filtering by time: #{query.to_sql || 'nil'}"
+    Rails.logger.info "Query before filtering by time: #{query.to_sql || 'nil'}"
   
     # Filter by time if start_time and end_time are provided
     travel_patterns = self.filter_by_time(query.distinct, query_params[:start_time], query_params[:end_time])
   
-    Rails.logger.info "🟢 Final travel patterns after time filtering: #{travel_patterns.map(&:id) || 'nil'}"
+    Rails.logger.info "Final travel patterns after time filtering: #{travel_patterns.map(&:id) || 'nil'}"
 
     if travel_patterns.empty?
       Rails.logger.warn("No valid travel patterns found after time filtering. Exiting early.")
@@ -490,34 +490,34 @@ class TravelPattern < ApplicationRecord
     trip_start = trip_start.to_i
     trip_end = (trip_end || trip_start).to_i
   
-    Rails.logger.info("🟡 Filtering Travel Patterns | Start Time: #{trip_start || 'nil'}, End Time: #{trip_end || 'nil'}")
+    Rails.logger.info("Filtering Travel Patterns | Start Time: #{trip_start || 'nil'}, End Time: #{trip_end || 'nil'}")
   
     travel_patterns = travel_pattern_query.eager_load(travel_pattern_service_schedules: { service_schedule: [:service_schedule_type, :service_sub_schedules] })
-    Rails.logger.info("🟡 Travel Patterns before time filtering: #{travel_patterns.map(&:id) || 'nil'}")
+    Rails.logger.info("Travel Patterns before time filtering: #{travel_patterns.map(&:id) || 'nil'}")
   
     valid_patterns = travel_patterns.select do |travel_pattern|
       schedules = travel_pattern.schedules_by_type || {}
   
-      Rails.logger.info("🔍 Checking Travel Pattern ##{travel_pattern.id || 'nil'}")
+      Rails.logger.info("Checking Travel Pattern ##{travel_pattern.id || 'nil'}")
   
       if schedules[:reduced_service_schedules]&.any?
-        Rails.logger.info("✅ Travel Pattern ##{travel_pattern.id || 'nil'} has reduced service schedules, using those")
+        Rails.logger.info("Travel Pattern ##{travel_pattern.id || 'nil'} has reduced service schedules, using those")
         schedules = schedules[:reduced_service_schedules]
       else
-        Rails.logger.info("❌ Travel Pattern ##{travel_pattern.id || 'nil'} has no reduced service schedules, checking other types")
+        Rails.logger.info("Travel Pattern ##{travel_pattern.id || 'nil'} has no reduced service schedules, checking other types")
         schedules = (schedules[:weekly_schedules] || []) + (schedules[:extra_service_schedules] || [])
       end
   
       schedules.any? do |travel_pattern_service_schedule|
         service_schedule = travel_pattern_service_schedule.service_schedule
   
-        Rails.logger.info("📆 Service Schedule: #{service_schedule&.name || 'nil'} (ID: #{service_schedule&.id || 'nil'})")
+        Rails.logger.info("Service Schedule: #{service_schedule&.name || 'nil'} (ID: #{service_schedule&.id || 'nil'})")
   
         service_schedule&.service_sub_schedules&.any? do |sub_schedule|
           valid_start_time = sub_schedule&.start_time.to_i <= trip_start
           valid_end_time = sub_schedule&.end_time.to_i >= trip_end
   
-          Rails.logger.info("    - ⏳ Checking Sub-Schedule ID: #{sub_schedule&.id || 'nil'} | Day: #{sub_schedule&.day || 'nil'}, Time: #{sub_schedule&.start_time || 'nil'}-#{sub_schedule&.end_time || 'nil'}")
+          Rails.logger.info("    - Checking Sub-Schedule ID: #{sub_schedule&.id || 'nil'} | Day: #{sub_schedule&.day || 'nil'}, Time: #{sub_schedule&.start_time || 'nil'}-#{sub_schedule&.end_time || 'nil'}")
           Rails.logger.info("      -> Trip Start Time: #{trip_start || 'nil'}, Trip End Time: #{trip_end || 'nil'}")
           Rails.logger.info("      -> Valid Start? #{valid_start_time}, Valid End? #{valid_end_time}")
   
@@ -526,7 +526,7 @@ class TravelPattern < ApplicationRecord
       end
     end
   
-    Rails.logger.info("🟢 Final valid travel patterns after time filtering: #{valid_patterns.map(&:id) || 'nil'}")
+    Rails.logger.info("Final valid travel patterns after time filtering: #{valid_patterns.map(&:id) || 'nil'}")
     valid_patterns
   end   # end filter_by_time
 
