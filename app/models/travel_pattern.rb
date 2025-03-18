@@ -422,6 +422,11 @@ class TravelPattern < ApplicationRecord
     travel_patterns = self.filter_by_time(query.distinct, query_params[:start_time], query_params[:end_time])
   
     Rails.logger.info "🟢 Final travel patterns after time filtering: #{travel_patterns.map(&:id) || 'nil'}"
+
+    if travel_patterns.empty?
+      Rails.logger.warn("No valid travel patterns found after time filtering. Exiting early.")
+      return { error: "No valid travel patterns found within the given timeframe." }
+    end
   
     travel_patterns
   end  
