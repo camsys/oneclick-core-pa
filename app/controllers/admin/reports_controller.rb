@@ -139,14 +139,15 @@ class Admin::ReportsController < Admin::AdminController
       snapshots = snapshots.where(purpose: purpose_names)
     end
   
-  
+    # Group by booking_id and select the snapshot with the earliest negotiated_pu
     snapshots = snapshots.group_by(&:booking_id).map { |_, group| group.min_by(&:negotiated_pu) }
-
-    snapshots.sort_by!(&:negotiated_pu)    
+  
+    # Sort the final set of snapshots by negotiated_pu
+    snapshots.sort_by!(&:negotiated_pu)
   
     respond_to do |format|
-      format.csv { send_data Admin::BookingSnapshotsReportCSVWriter.to_csv(snapshots) }
-    end    
+      format.csv { send_data snapshots.to_csv(Admin::BookingSnapshotsReportCSVWriter) }
+    end
   end
   
 
