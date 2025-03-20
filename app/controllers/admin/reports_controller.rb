@@ -123,22 +123,20 @@ class Admin::ReportsController < Admin::AdminController
     end
   
     # Build snapshots
+    @trips = @trips.order(:trip_time)
+    trip_ids = @trips.pluck(:id)
+    snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
+  
+    # Apply disposition filter only if explicitly requested
     if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
-      @trips = @trips.joins(:ecolane_booking_snapshot)
-                     .where(ecolane_booking_snapshots: { disposition_status: "Ecolane booking denial" })
-                     .order(:trip_time)
-      trip_ids = @trips.pluck(:id)
-      snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids, disposition_status: "Ecolane booking denial")
-    else
-      @trips = @trips.order(:trip_time)
-      trip_ids = @trips.pluck(:id)
-      snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
-      snapshots = snapshots.where("negotiated_pu >= ?", @trip_time_from_date) if @trip_time_from_date.present?
-      snapshots = snapshots.where("negotiated_pu <= ?", @trip_time_to_date) if @trip_time_to_date.present?
-      unless @purposes.empty?
-        purpose_names = Purpose.where(id: @purposes).pluck(:name)
-        snapshots = snapshots.where(purpose: purpose_names)
-      end
+      snapshots = snapshots.where(disposition_status: "Ecolane booking denial")
+    end
+  
+    snapshots = snapshots.where("negotiated_pu >= ?", @trip_time_from_date) if @trip_time_from_date.present?
+    snapshots = snapshots.where("negotiated_pu <= ?", @trip_time_to_date) if @trip_time_to_date.present?
+    unless @purposes.empty?
+      purpose_names = Purpose.where(id: @purposes).pluck(:name)
+      snapshots = snapshots.where(purpose: purpose_names)
     end
   
     # 1) DISTINCT ON => one row (earliest negotiated_pu) per booking_id
@@ -149,7 +147,6 @@ class Admin::ReportsController < Admin::AdminController
       .order("ecolane_booking_snapshots.booking_id, ecolane_booking_snapshots.negotiated_pu")
       .to_sql
   
-    # If you want the final CSV sorted by 'trip_time', change to .order("ecolane_booking_snapshots.trip_time")
     snapshots = EcolaneBookingSnapshot
       .from("(#{distinct_subquery}) AS ecolane_booking_snapshots")
       .order("ecolane_booking_snapshots.negotiated_pu")
