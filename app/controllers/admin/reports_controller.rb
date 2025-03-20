@@ -146,8 +146,8 @@ class Admin::ReportsController < Admin::AdminController
     snapshots.sort_by!(&:negotiated_pu)
   
     respond_to do |format|
-      format.csv { send_data Admin::BookingSnapshotsReportCSVWriter.generate(snapshots) }
-    end
+      format.csv { send_data snapshots.to_csv(limit: CSVWriter::DEFAULT_RECORD_LIMIT, in_travel_patterns_mode: in_travel_patterns_mode?) }
+    end    
   end
   
 
