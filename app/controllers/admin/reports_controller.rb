@@ -141,19 +141,6 @@ class Admin::ReportsController < Admin::AdminController
       end
     end
   
-    # 1) DISTINCT ON => one row (earliest negotiated_pu) per booking_id
-    # 2) Then globally sort the final rows by trip_time (or negotiated_pu).
-    distinct_subquery = snapshots
-      .unscope(:order)
-      .select("DISTINCT ON (ecolane_booking_snapshots.booking_id) ecolane_booking_snapshots.*")
-      .order("ecolane_booking_snapshots.booking_id, ecolane_booking_snapshots.negotiated_pu")
-      .to_sql
-  
-    # If you want the final CSV sorted by 'trip_time', change to .order("ecolane_booking_snapshots.trip_time")
-    snapshots = EcolaneBookingSnapshot
-      .from("(#{distinct_subquery}) AS ecolane_booking_snapshots")
-      .order("ecolane_booking_snapshots.negotiated_pu")
-  
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }
     end
