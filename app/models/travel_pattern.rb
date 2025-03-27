@@ -508,22 +508,17 @@ class TravelPattern < ApplicationRecord
         schedules = (schedules[:weekly_schedules] || []) + (schedules[:extra_service_schedules] || [])
       end
   
-      schedules.any? do |travel_pattern_service_schedule|
-        service_schedule = travel_pattern_service_schedule.service_schedule
-  
-        Rails.logger.info("Service Schedule: #{service_schedule&.name || 'nil'} (ID: #{service_schedule&.id || 'nil'})")
-  
-        service_schedule&.service_sub_schedules&.any? do |sub_schedule|
-          valid_start_time = sub_schedule&.start_time.to_i <= trip_start
-          valid_end_time = sub_schedule&.end_time.to_i >= trip_end
-  
-          Rails.logger.info("    - Checking Sub-Schedule ID: #{sub_schedule&.id || 'nil'} | Day: #{sub_schedule&.day || 'nil'}, Time: #{sub_schedule&.start_time || 'nil'}-#{sub_schedule&.end_time || 'nil'}")
-          Rails.logger.info("      -> Trip Start Time: #{trip_start || 'nil'}, Trip End Time: #{trip_end || 'nil'}")
-          Rails.logger.info("      -> Valid Start? #{valid_start_time}, Valid End? #{valid_end_time}")
-  
-          valid_start_time && valid_end_time
-        end
+      valid_start = schedules.any? do |tp_schedule|
+        ss = tp_schedule.service_schedule.service_sub_schedules
+        ss.any? { |s| s.start_time.to_i <= trip_start && s.end_time.to_i >= trip_start }
       end
+      
+      valid_end = schedules.any? do |tp_schedule|
+        ss = tp_schedule.service_schedule.service_sub_schedules
+        ss.any? { |s| s.start_time.to_i <= trip_end && s.end_time.to_i >= trip_end }
+      end
+      
+      valid_start && valid_end      
     end
   
     Rails.logger.info("Final valid travel patterns after time filtering: #{valid_patterns.map(&:id) || 'nil'}")
