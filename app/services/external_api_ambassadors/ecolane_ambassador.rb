@@ -997,7 +997,8 @@ class EcolaneAmbassador < BookingAmbassador
     funding_source_combinations = valid_funding_source_combinations
     funding_source_names = funding_source_combinations.map{|combo| combo[:funding_source]}
     trip_date = @outbound_trip.trip_time.to_date
-    start_time = @outbound_trip.trip_time - @outbound_trip.trip_time.midnight
+    trip_time_local = @outbound_trip.trip_time.in_time_zone(@service.time_zone || 'Eastern Time (US & Canada)')
+    start_time = trip_time_local.seconds_since_midnight.to_i    
 
     # inbound_trip could be nil for one-way trips
     if @inbound_trip
