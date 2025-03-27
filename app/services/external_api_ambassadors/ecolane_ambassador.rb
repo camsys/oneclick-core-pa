@@ -1002,7 +1002,7 @@ class EcolaneAmbassador < BookingAmbassador
 
     # inbound_trip could be nil for one-way trips
     if @inbound_trip
-      end_time = @inbound_trip.trip_time - @inbound_trip.trip_time.midnight
+      end_time = @inbound_trip.trip_time.in_time_zone('Eastern Time (US & Canada)').seconds_since_midnight.to_i
     else
       end_time = nil
     end
