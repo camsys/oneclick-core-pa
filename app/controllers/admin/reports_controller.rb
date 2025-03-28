@@ -110,37 +110,34 @@ class Admin::ReportsController < Admin::AdminController
   end
   
   def trips_table
-    # Apply all the trip filters to get the correct set of trip IDs.
     @trips = current_user.get_trips_for_staff_user.limit(CSVWriter::DEFAULT_RECORD_LIMIT)
     @trips = @trips.from_date(@trip_time_from_date).to_date(@trip_time_to_date)
     @trips = @trips.with_purpose(Purpose.where(id: @purposes).pluck(:name)) unless @purposes.empty?
     @trips = @trips.origin_in(@trip_origin_region.geom) unless @trip_origin_region.empty?
     @trips = @trips.destination_in(@trip_destination_region.geom) unless @trip_destination_region.empty?
     @trips = @trips.oversight_agency_in(@oversight_agency) unless @oversight_agency.blank?
+  
     if @trip_only_created_in_1click
       @trips = @trips.joins(itineraries: :booking)
                      .where(itineraries: { trip_type: 'paratransit' }, bookings: { created_in_1click: true })
-    end    
-    if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
-      # Only consider trips that have a snapshot with a denied disposition.
-      @trips = @trips.joins(:ecolane_booking_snapshot)
-                     .where(ecolane_booking_snapshots: { disposition_status: "Ecolane booking denial" })
-                     .order(:trip_time)
-      trip_ids = @trips.pluck(:id)
-      snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
-                                        .where(disposition_status: "Ecolane booking denial")
-    else
-      @trips = @trips.order(:trip_time)
-      trip_ids = @trips.pluck(:id)
-      snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
-      snapshots = snapshots.where("negotiated_pu >= ?", @trip_time_from_date) if @trip_time_from_date.present?
-      snapshots = snapshots.where("negotiated_pu <= ?", @trip_time_to_date) if @trip_time_to_date.present?
-      unless @purposes.empty?
-        purpose_names = Purpose.where(id: @purposes).pluck(:name)
-        snapshots = snapshots.where(purpose: purpose_names)
-      end
-      snapshots = snapshots.order("negotiated_pu").distinct(:booking_id)
     end
+  
+      # Build snapshots
+      if Config.dashboard_mode.to_sym == :travel_patterns && params[:ecolane_denied_trips_only].to_bool
+        @trips = @trips.joins(:ecolane_booking_snapshot)
+                        .where(ecolane_booking_snapshots: { disposition_status: "Ecolane booking denial" })
+                        .order(:trip_time)
+        trip_ids = @trips.pluck(:id)
+        snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids, disposition_status: "Ecolane booking denial")
+      else
+        @trips = @trips.order(:trip_time)
+        trip_ids = @trips.pluck(:id)
+        snapshots = EcolaneBookingSnapshot.where(trip_id: trip_ids)
+        unless @purposes.empty?
+          purpose_names = Purpose.where(id: @purposes).pluck(:name)
+          snapshots = snapshots.where(purpose: purpose_names)
+        end
+      end
   
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }

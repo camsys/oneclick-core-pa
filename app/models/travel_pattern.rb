@@ -420,9 +420,14 @@ class TravelPattern < ApplicationRecord
 
     # Filter by time if start_time and end_time are provided
     travel_patterns = self.filter_by_time(query.distinct, query_params[:start_time], query_params[:end_time])
+  
+    Rails.logger.info "Final travel patterns after time filtering: #{travel_patterns.map(&:id) || 'nil'}"
 
-    Rails.logger.info "Final travel patterns: #{travel_patterns.map(&:id)}"
-
+    if travel_patterns.empty?
+      Rails.logger.warn("No valid travel patterns found after time filtering. Exiting early.")
+      return { error: "No valid travel patterns found within the given timeframe." }
+    end
+  
     travel_patterns
   end
 
@@ -503,12 +508,24 @@ class TravelPattern < ApplicationRecord
       # Grab any valid schedules
       schedules.any? do |travel_pattern_service_schedule|
         service_schedule = travel_pattern_service_schedule.service_schedule
-        service_schedule.service_sub_schedules.any? do |sub_schedule|
-          valid_start_time = sub_schedule.start_time <= trip_start
+  
+        Rails.logger.info("Service Schedule: #{service_schedule&.name || 'nil'} (ID: #{service_schedule&.id || 'nil'})")
+  
+        service_schedule&.service_sub_schedules&.any? do |sub_schedule|
+          valid_start_time = sub_schedule&.start_time.to_i <= trip_start
+          valid_end_time = sub_schedule&.end_time.to_i >= trip_end
+  
+          Rails.logger.info("    - Checking Sub-Schedule ID: #{sub_schedule&.id || 'nil'} | Day: #{sub_schedule&.day || 'nil'}, Time: #{sub_schedule&.start_time || 'nil'}-#{sub_schedule&.end_time || 'nil'}")
+          Rails.logger.info("      -> Trip Start Time: #{trip_start || 'nil'}, Trip End Time: #{trip_end || 'nil'}")
+          Rails.logger.info("      -> Valid Start? #{valid_start_time}, Valid End? #{valid_end_time}")
+  
           valid_start_time && valid_end_time
         end
       end
     end # end travel_patterns.select
+  
+    Rails.logger.info("Final valid travel patterns after time filtering: #{valid_patterns.map(&:id) || 'nil'}")
+    valid_patterns
   end # end filter_by_time
 
 end
