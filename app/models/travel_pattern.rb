@@ -485,6 +485,8 @@ class TravelPattern < ApplicationRecord
   # This method should be the first time we call the database, before this we were only constructing the query
   def self.filter_by_time(travel_pattern_query, trip_start, trip_end, date = nil)
     return travel_pattern_query unless trip_start
+    Rails.logger.info("Filtering Travel Patterns by time") 
+    Rails.logger.info("Trip end: #{trip_end}")
   
     trip_start = trip_start.to_i
     trip_end = (trip_end || trip_start).to_i
