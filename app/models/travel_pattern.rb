@@ -483,15 +483,13 @@ class TravelPattern < ApplicationRecord
   end
 
   # This method should be the first time we call the database, before this we were only constructing the query
-  def self.filter_by_time(travel_pattern_query, trip_start, trip_end, date = nil)
+  def self.filter_by_time(travel_pattern_query, trip_start, _trip_end, date = nil)
     return travel_pattern_query unless trip_start
     Rails.logger.info("Filtering Travel Patterns by time") 
-    Rails.logger.info("Trip end: #{trip_end}")
   
     trip_start = trip_start.to_i
-    trip_end = (trip_end || trip_start).to_i
   
-    Rails.logger.info("Filtering Travel Patterns | Start Time: #{trip_start}, End Time: #{trip_end}, Date: #{date}")
+    Rails.logger.info("Filtering Travel Patterns | Start Time: #{trip_start}, Date: #{date}")
   
     travel_patterns = travel_pattern_query.eager_load(travel_pattern_service_schedules: { service_schedule: [:service_schedule_type, :service_sub_schedules] })
   
@@ -510,19 +508,12 @@ class TravelPattern < ApplicationRecord
         match
       end
   
-      valid_end = sub_schedules.any? do |ss|
-        match = ss.start_time.to_i <= trip_end && ss.end_time.to_i >= trip_end
-        Rails.logger.info("    - End Check: SS##{ss.id} | #{ss.start_time}-#{ss.end_time} → #{match}")
-        match
-      end
-  
-      result = valid_start && valid_end
-      Rails.logger.info("  → Result for TP##{tp.id}: valid_start=#{valid_start}, valid_end=#{valid_end}, FINAL=#{result}")
-      result
+      Rails.logger.info("  → Result for TP##{tp.id}: valid_start=#{valid_start}")
+      valid_start
     end
   
     Rails.logger.info("Final valid travel patterns after time filtering: #{valid_patterns.map(&:id) || 'nil'}")
     valid_patterns
-  end # end filter_by_time
+  end# end filter_by_time
 
 end
