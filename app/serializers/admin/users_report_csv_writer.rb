@@ -5,7 +5,7 @@ module Admin
     associations :trips, :preferred_locale
     
     def trips_planned
-      @record.trips.joins(:ecolane_booking_snapshot).distinct.count
+      @record.trips.distinct.count
     end    
 
   end
