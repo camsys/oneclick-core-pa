@@ -449,11 +449,15 @@ class TravelPattern < ApplicationRecord
       Rails.logger.info "Initial end_date: #{end_date}"
   
       days_notice = (business_days.include?(date.strftime('%Y-%m-%d')) && !additional_notice) ? 0 : -1
-      while (days_notice < booking_window.minimum_days_notice && date < end_date) do
+      while (days_notice < booking_window.maximum_days_notice && date <= end_date) do
         date += 1.day
-        days_notice += 1 if business_days.include?(date.strftime('%Y-%m-%d'))
-        Rails.logger.info "Calculating start_date: #{date}, days_notice: #{days_notice}"
-      end
+        if business_days.include?(date.strftime('%Y-%m-%d'))
+          days_notice += 1
+          Rails.logger.info "Incremented days_notice to #{days_notice} on #{date}"
+        else
+          Rails.logger.info "Skipped #{date} – not a business day"
+        end
+      end      
   
       start_date = date
       Rails.logger.info "Final start_date: #{start_date}"
