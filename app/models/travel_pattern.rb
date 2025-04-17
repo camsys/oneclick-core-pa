@@ -293,63 +293,58 @@ class TravelPattern < ApplicationRecord
   #   :calendar_length => +start_date+ + 59.days
   # 
   # @return [Hash] The structure is {"%Y-%m-%d" => { start_time: +Integer+, end_time: +Integer+ }}
-  def to_calendar(start_date, end_date = start_date + 59.days, valid_from = nil, valid_until = nil)
+  def to_calendar(start_date, end_date = nil, valid_from = nil, valid_until = nil)
+    # 1) figure out our hard cap from the booking window
+    max_days = booking_window.maximum_days_notice
+    max_end  = start_date + max_days.days
+
+    # 2) apply it (if they didn’t pass an end_date, use the cap; if they did, take the min)
+    raw_end = end_date || max_end
+    end_date = [raw_end, max_end].min
+
+    Rails.logger.info "[to_calendar] Pattern##{id} booking_window.maximum_days_notice=#{max_days} → capping raw_end=#{raw_end} to end_date=#{end_date}"
+
     travel_pattern_service_schedules = schedules_by_type
-  
-    weekly_schedules = travel_pattern_service_schedules[:weekly_schedules].map(&:service_schedule)
-    extra_service_schedules = travel_pattern_service_schedules[:extra_service_schedules].map(&:service_schedule)
-    reduced_service_schedules = travel_pattern_service_schedules[:reduced_service_schedules].map(&:service_schedule)
-  
+    weekly_schedules  = travel_pattern_service_schedules[:weekly_schedules].map(&:service_schedule)
+    extra_schedules   = travel_pattern_service_schedules[:extra_service_schedules].map(&:service_schedule)
+    reduced_schedules = travel_pattern_service_schedules[:reduced_service_schedules].map(&:service_schedule)
+
     calendar = {}
-    date = start_date
-  
+    date     = start_date
+
     while date <= end_date
-      date_string = date.strftime('%Y-%m-%d')
-      calendar[date_string] = []
-      
-      has_holiday = false
-  
-      # Check reduced service schedules for holidays (nil start and end times)
-      reduced_service_schedules.each do |service_schedule|
-        next unless (service_schedule.start_date.nil? || service_schedule.start_date <= date) && 
-                    (service_schedule.end_date.nil? || service_schedule.end_date >= date)
-  
-        service_schedule.service_sub_schedules.each do |sub_schedule|
-          if sub_schedule.calendar_date == date && sub_schedule.start_time.nil? && sub_schedule.end_time.nil?
-            # Mark as holiday; do not add any time slots for this day
-            has_holiday = true
-            break
-          end
-        end
-  
-        break if has_holiday # Exit early if a holiday is found
+      key = date.strftime('%Y-%m-%d')
+      calendar[key] = []
+
+      # --- holiday logic unchanged ---
+      has_holiday = reduced_schedules.any? do |ss|
+        (ss.start_date.nil? || ss.start_date <= date) &&
+        (ss.end_date.nil?   || ss.end_date   >= date) &&
+        ss.service_sub_schedules.any? { |sub| sub.calendar_date == date && sub.start_time.nil? && sub.end_time.nil? }
       end
-  
-      # Proceed with adding time slots only if no holiday was found
+
       unless has_holiday
-        sub_schedules = (weekly_schedules + extra_service_schedules).flat_map do |service_schedule|
-          next unless (service_schedule.start_date.nil? || service_schedule.start_date <= date) &&
-                      (service_schedule.end_date.nil? || service_schedule.end_date >= date)
-  
-          service_schedule.service_sub_schedules.select do |sub_schedule|
-            (sub_schedule.day == date.wday || sub_schedule.calendar_date == date) &&
-            !(sub_schedule.start_time.nil? && sub_schedule.end_time.nil?) # Exclude nil times
+        slots = (weekly_schedules + extra_schedules).flat_map do |ss|
+          next unless (ss.start_date.nil? || ss.start_date <= date) &&
+                      (ss.end_date.nil?   || ss.end_date   >= date)
+
+          ss.service_sub_schedules.select do |sub|
+            (sub.day == date.wday || sub.calendar_date == date) &&
+            !(sub.start_time.nil? && sub.end_time.nil?)
           end
         end.compact
-  
-        # Map to start_time and end_time, excluding nil values explicitly
-        sub_schedules.each do |ss|
-          calendar[date_string] << { start_time: ss.start_time, end_time: ss.end_time } unless ss.start_time.nil? || ss.end_time.nil?
+
+        slots.each do |sub|
+          calendar[key] << { start_time: sub.start_time, end_time: sub.end_time }
         end
       end
-  
-      # Move to the next day
+
       date += 1.day
     end
-  
+
+    Rails.logger.info "[to_calendar] generated calendar for Pattern##{id} from #{start_date} to #{end_date} (#{calendar.keys.size} days)"
     calendar
   end
-  
   
   
   
