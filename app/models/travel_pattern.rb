@@ -295,6 +295,8 @@ class TravelPattern < ApplicationRecord
   # 
   # @return [Hash] The structure is {"%Y-%m-%d" => { start_time: +Integer+, end_time: +Integer+ }}
   def to_calendar(start_date, end_date = start_date + 59.days, valid_from = nil, valid_until = nil)
+    Rails.logger.info "[to_calendar] called with start_date: #{start_date}, end_date: #{end_date}, valid_from: #{valid_from}, valid_until: #{valid_until}"
+  
     travel_pattern_service_schedules = schedules_by_type
   
     weekly_schedules = travel_pattern_service_schedules[:weekly_schedules].map(&:service_schedule)
@@ -307,26 +309,22 @@ class TravelPattern < ApplicationRecord
     while date <= end_date
       date_string = date.strftime('%Y-%m-%d')
       calendar[date_string] = []
-      
       has_holiday = false
   
-      # Check reduced service schedules for holidays (nil start and end times)
       reduced_service_schedules.each do |service_schedule|
-        next unless (service_schedule.start_date.nil? || service_schedule.start_date <= date) && 
+        next unless (service_schedule.start_date.nil? || service_schedule.start_date <= date) &&
                     (service_schedule.end_date.nil? || service_schedule.end_date >= date)
   
         service_schedule.service_sub_schedules.each do |sub_schedule|
           if sub_schedule.calendar_date == date && sub_schedule.start_time.nil? && sub_schedule.end_time.nil?
-            # Mark as holiday; do not add any time slots for this day
             has_holiday = true
             break
           end
         end
   
-        break if has_holiday # Exit early if a holiday is found
+        break if has_holiday
       end
   
-      # Proceed with adding time slots only if no holiday was found
       unless has_holiday
         sub_schedules = (weekly_schedules + extra_service_schedules).flat_map do |service_schedule|
           next unless (service_schedule.start_date.nil? || service_schedule.start_date <= date) &&
@@ -334,22 +332,22 @@ class TravelPattern < ApplicationRecord
   
           service_schedule.service_sub_schedules.select do |sub_schedule|
             (sub_schedule.day == date.wday || sub_schedule.calendar_date == date) &&
-            !(sub_schedule.start_time.nil? && sub_schedule.end_time.nil?) # Exclude nil times
+            !(sub_schedule.start_time.nil? && sub_schedule.end_time.nil?)
           end
         end.compact
   
-        # Map to start_time and end_time, excluding nil values explicitly
         sub_schedules.each do |ss|
           calendar[date_string] << { start_time: ss.start_time, end_time: ss.end_time } unless ss.start_time.nil? || ss.end_time.nil?
         end
       end
   
-      # Move to the next day
       date += 1.day
     end
   
+    Rails.logger.info "[to_calendar] generated calendar from #{start_date} to #{end_date} (#{calendar.size} days)"
     calendar
   end
+  
   
   
   
@@ -461,6 +459,8 @@ class TravelPattern < ApplicationRecord
       Rails.logger.info "Final start_date: #{start_date}"
   
       Rails.logger.info "Before while loop for end_date calculation: date: #{date}, days_notice: #{days_notice}, end_date: #{end_date}, business_days: #{business_days}"
+
+      Rails.logger.info "Booking window: minimum_days_notice: #{booking_window.minimum_days_notice}, maximum_days_notice: #{booking_window.maximum_days_notice}"
   
       while (days_notice < booking_window.maximum_days_notice && date < end_date) do
         date += 1.day
