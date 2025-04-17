@@ -295,44 +295,52 @@ class TravelPattern < ApplicationRecord
   # 
   # @return [Hash] The structure is {"%Y-%m-%d" => { start_time: +Integer+, end_time: +Integer+ }}
   def to_calendar(start_date, end_date = nil, valid_from = nil, valid_until = nil)
-    # cap default/explicit end_date to your booking_window.maximum_days_notice
-    max_end   = start_date + booking_window.maximum_days_notice.days
+    # cap any window to booking_window.maximum_days_notice
+    max_end = start_date + booking_window.maximum_days_notice.days
     end_date ||= max_end
-    end_date   = [end_date, max_end].min
+    end_date  = [end_date, max_end].min
     Rails.logger.info "[to_calendar] window capped to #{booking_window.maximum_days_notice} days → #{start_date}…#{end_date}"
 
     travel_pattern_service_schedules = schedules_by_type
-    weekly_schedules   = travel_pattern_service_schedules[:weekly_schedules].map(&:service_schedule)
-    extra_schedules    = travel_pattern_service_schedules[:extra_service_schedules].map(&:service_schedule)
-    reduced_schedules  = travel_pattern_service_schedules[:reduced_service_schedules].map(&:service_schedule)
+    weekly_schedules  = travel_pattern_service_schedules[:weekly_schedules].map(&:service_schedule)
+    extra_schedules   = travel_pattern_service_schedules[:extra_service_schedules].map(&:service_schedule)
+    reduced_schedules = travel_pattern_service_schedules[:reduced_service_schedules].map(&:service_schedule)
 
     calendar = {}
     date     = start_date
 
     while date <= end_date
-      date_string = date.strftime('%Y-%m-%d')
-      calendar[date_string] = []
+      key = date.strftime('%Y-%m-%d')
+      calendar[key] = []
 
-      # holiday check
-      if reduced_schedules.any? { |ss| ss.covers?(date) && ss.holiday_on?(date) }
-        date += 1.day
-        next
+      # check for a holiday override
+      has_holiday = reduced_schedules.any? do |ss|
+        (ss.start_date.nil? || ss.start_date <= date) &&
+        (ss.end_date.nil?   || ss.end_date   >= date) &&
+        ss.service_sub_schedules.any? { |sub| sub.calendar_date == date && sub.start_time.nil? && sub.end_time.nil? }
       end
 
-      # normal service days
-      slots = (weekly_schedules + extra_schedules).flat_map do |ss|
-        next unless ss.active_on?(date)
-        ss.sub_schedules_for(date)
-      end.compact
+      unless has_holiday
+        # collect all matching sub‐schedules
+        slots = (weekly_schedules + extra_schedules).flat_map do |ss|
+          next unless (ss.start_date.nil? || ss.start_date <= date) &&
+                      (ss.end_date.nil?   || ss.end_date   >= date)
 
-      slots.each do |sub|
-        calendar[date_string] << { start_time: sub.start_time, end_time: sub.end_time }
+          ss.service_sub_schedules.select do |sub|
+            (sub.day == date.wday || sub.calendar_date == date) &&
+            !(sub.start_time.nil? && sub.end_time.nil?)
+          end
+        end.compact
+
+        slots.each do |sub|
+          calendar[key] << { start_time: sub.start_time, end_time: sub.end_time }
+        end
       end
 
       date += 1.day
     end
 
-    Rails.logger.info "[to_calendar] generated calendar with #{calendar.size} days"
+    Rails.logger.info "[to_calendar] generated calendar from #{start_date} to #{end_date} (#{calendar.size} days)"
     calendar
   end
   
@@ -426,28 +434,30 @@ class TravelPattern < ApplicationRecord
       additional_notice = service.localtime.hour >= booking_window.minimum_notice_cutoff_hour
       date              = service.localtime.to_date
 
-      # 1) Find the first bookable date using minimum_days_notice
+      # 1) Advance to the pattern’s minimum notice
       days_notice = (business_days.include?(date.strftime('%Y-%m-%d')) && !additional_notice) ? 0 : -1
-      while days_notice < booking_window.minimum_days_notice && date < (date + 60.days)
+      while days_notice < booking_window.minimum_days_notice
         date += 1.day
         days_notice += 1 if business_days.include?(date.strftime('%Y-%m-%d'))
-        Rails.logger.info "Calculating start_date: #{date}, days_notice: #{days_notice}"
+        Rails.logger.info "[to_api_response] Calculating start_date: #{date}, days_notice: #{days_notice}"
       end
       start_date = date
-      Rails.logger.info "Final start_date for TP##{travel_pattern.id}: #{start_date}"
+      Rails.logger.info "[to_api_response] TP##{travel_pattern.id} start_date: #{start_date} (min=#{booking_window.minimum_days_notice})"
 
-      # 2) Then extend out only up to maximum_days_notice
-      while days_notice < booking_window.maximum_days_notice && date < (start_date + 60.days)
+      # 2) Then extend until the pattern’s maximum notice
+      while days_notice < booking_window.maximum_days_notice
         date += 1.day
         days_notice += 1 if business_days.include?(date.strftime('%Y-%m-%d'))
-        Rails.logger.info "Extending end_date: #{date}, days_notice: #{days_notice}"
+        Rails.logger.info "[to_api_response] Extending end_date: #{date}, days_notice: #{days_notice}"
       end
       end_date = date
-      Rails.logger.info "Final end_date for TP##{travel_pattern.id}: #{end_date}"
+      Rails.logger.info "[to_api_response] TP##{travel_pattern.id} end_date: #{end_date} (max=#{booking_window.maximum_days_notice})"
 
       travel_pattern.to_api_response(start_date, end_date, valid_from, valid_until)
     end
-    .select { |tp| tp["to_calendar"].values.flatten.any? { |r| r[:end_time].to_i > 0 } }
+    .select { |tp|
+      tp["to_calendar"].values.flatten.any? { |r| r[:end_time].to_i >  0 }
+    }
   end
   
 
