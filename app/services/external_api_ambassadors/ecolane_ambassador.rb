@@ -513,46 +513,51 @@ class EcolaneAmbassador < BookingAmbassador
 
   # Get a list of trip purposes for a customer
   def get_trip_purposes 
-    Rails.logger.info "[get_trip_purposes] called"
-  
     purposes = []
     purposes_hash = []
     customer_information = fetch_customer_information(funding=true)
     current_date = Date.today
-  
+
+    # Retrieve the maximum booking notice from Config or default to 59 if not set
     max_booking_notice_days = Config.find_by(key: 'maximum_booking_notice')&.value || 59
-    Rails.logger.info "[get_trip_purposes] max_booking_notice_days: #{max_booking_notice_days}"
   
     arrayify(customer_information["customer"]["funding"]["funding_source"]).each do |funding_source|
       valid_from = funding_source["valid_from"].present? ? Date.parse(funding_source["valid_from"]) : current_date
       valid_until = funding_source["valid_until"].present? ? Date.parse(funding_source["valid_until"]) : nil
   
-      Rails.logger.info "[get_trip_purposes] FS #{funding_source["name"]} → valid_from: #{valid_from}, valid_until: #{valid_until}"
-  
+      # Skip if the funding source has expired
       next if valid_until && valid_until < current_date
-      next if valid_from && valid_from > current_date + [59, max_booking_notice_days.to_i].max.days
+  
+      # Skip if valid_from is more than the greater of 59 days or maximum booking notice into the future
+      next if valid_from && valid_from > current_date + [59, max_booking_notice_days].max.days
   
       if not @use_ecolane_rules and not funding_source["name"].strip.in? @preferred_funding_sources
-        Rails.logger.info "[get_trip_purposes] skipping FS #{funding_source["name"]} (not in preferred)"
         next 
       end
-  
       arrayify(funding_source["allowed"]).each do |allowed|
+        purpose = allowed["purpose"]
+
+        # Skip if the sponsor is not in the list of preferred sponsors
         next unless @preferred_sponsors.include?(allowed["sponsor"])
-        purposes << allowed["purpose"]
-  
-        purposes_hash << {
+
+        # Add the date range for which the purpose is eligible, if available.
+        purpose_hash = {
           code: allowed["purpose"],
-          valid_from: valid_from.to_s,
-          valid_until: valid_until&.to_s
+          valid_from: valid_from.to_s, # Ensuring it's always populated
+          valid_until: valid_until&.to_s # Handling nil case gracefully
         }
+        
+        unless purpose.in? purposes #or purpose.downcase.strip.in? (disallowed_purposes.map { |p| p.downcase.strip } || "")
+          purposes.append(purpose)
+        end
+        purposes_hash << purpose_hash
       end
     end
-  
-    Rails.logger.info "[get_trip_purposes] collected #{purposes_hash.size} purpose hashes"
-    [purposes.sort.uniq, purposes_hash]
+
+    banned_purposes = @service.banned_purpose_names
+    purposes = purposes.sort.uniq - banned_purposes
+    [purposes, purposes_hash]
   end
-  
 
 
   ##
