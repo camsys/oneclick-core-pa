@@ -298,17 +298,17 @@ class TravelPattern < ApplicationRecord
     max_days = booking_window.maximum_days_notice
 
     travel_pattern_service_schedules = schedules_by_type
+
     weekly_schedules  = travel_pattern_service_schedules[:weekly_schedules].map(&:service_schedule)
     extra_service_schedules   = travel_pattern_service_schedules[:extra_service_schedules].map(&:service_schedule)
     reduced_service_schedules = travel_pattern_service_schedules[:reduced_service_schedules].map(&:service_schedule)
 
-    # 2) find end_date by counting only days with actual service slots (excluding holidays and empty days)
-    service_day_count = 0
-    date_iter        = start_date
-    hard_end         = end_date  # if provided, serves as an absolute cutoff
+    # 2) find the true end_date by counting only service days
+    service_days_count = 0
+    date_iter         = start_date
 
-    while service_day_count < max_days && (hard_end.nil? || date_iter <= hard_end)
-      # detect holiday
+    while service_days_count < max_days
+      # holiday check
       has_holiday = reduced_service_schedules.any? do |ss|
         (ss.start_date.nil? || ss.start_date <= date_iter) &&
         (ss.end_date.nil?   || ss.end_date   >= date_iter) &&
@@ -316,7 +316,7 @@ class TravelPattern < ApplicationRecord
       end
 
       unless has_holiday
-        # see if any real slots exist on this date
+        # collect any real slots for this date
         slots = (weekly_schedules + extra_service_schedules).flat_map do |ss|
           next unless (ss.start_date.nil? || ss.start_date <= date_iter) &&
                       (ss.end_date.nil?   || ss.end_date   >= date_iter)
@@ -327,16 +327,16 @@ class TravelPattern < ApplicationRecord
           end
         end.compact
 
-        service_day_count += 1 if slots.any?
+        service_days_count += 1 if slots.any?
       end
 
       date_iter += 1.day
     end
 
     end_date = date_iter - 1.day
-    Rails.logger.info "[to_calendar] Pattern##{id} booking_window.maximum_days_notice=#{max_days} → capping after #{service_day_count} service days to end_date=#{end_date}"
+    Rails.logger.info "[to_calendar] Pattern##{id} booking_window.maximum_days_notice=#{max_days} → capping after #{service_days_count} service days to end_date=#{end_date}"
 
-    # 3) build the calendar only up to that service-based end_date
+    # 3) build the actual calendar up to that service‑based end_date
     calendar = {}
     date     = start_date
 
@@ -347,7 +347,7 @@ class TravelPattern < ApplicationRecord
 
       # Check reduced service schedules for holidays (nil start and end times)
       reduced_service_schedules.each do |service_schedule|
-        next unless (service_schedule.start_date.nil? || service_schedule.start_date <= date) &&
+        next unless (service_schedule.start_date.nil? || service_schedule.start_date <= date) && 
                     (service_schedule.end_date.nil?   || service_schedule.end_date   >= date)
 
         service_schedule.service_sub_schedules.each do |sub_schedule|
@@ -357,6 +357,7 @@ class TravelPattern < ApplicationRecord
             break
           end
         end
+
         break if has_holiday # Exit early if a holiday is found
       end
 
@@ -372,7 +373,7 @@ class TravelPattern < ApplicationRecord
           end
         end.compact
 
-        # Map to start_time and end_time
+        # Map to start_time and end_time, excluding nil values explicitly
         sub_schedules.each do |ss|
           calendar[date_string] << { start_time: ss.start_time, end_time: ss.end_time }
         end
