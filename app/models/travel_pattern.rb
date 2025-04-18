@@ -443,7 +443,7 @@ class TravelPattern < ApplicationRecord
   # Class Methods
   def self.to_api_response(travel_patterns, service, valid_from = nil, valid_until = nil)
     business_days = service.business_days
-
+  
     # Filter out any patterns with no bookable dates. This can happen prior to selecting a date and time
     # if a travel pattern has only calendar date schedules and the dates are outside of the booking window.
     travel_patterns = [travel_patterns].flatten
@@ -451,38 +451,48 @@ class TravelPattern < ApplicationRecord
       booking_window    = travel_pattern.booking_window
       additional_notice = service.localtime.hour >= booking_window.minimum_notice_cutoff_hour
       date              = service.localtime.to_date
-
+  
+      # build a mini‐calendar for just this pattern up to its max notice
+      raw_end          = date + booking_window.maximum_days_notice.days
+      pattern_calendar = travel_pattern.to_calendar(date, raw_end, valid_from, valid_until)
+  
       start_date = date
-      # use booking_window.maximum_days_notice instead of fixed 60.days
       end_date   = date + booking_window.maximum_days_notice.days
-
+  
       Rails.logger.info "Initial date: #{date}"
       Rails.logger.info "Initial start_date: #{start_date}"
       Rails.logger.info "Initial end_date: #{end_date}"
-
-      days_notice = (business_days.include?(date.strftime('%Y-%m-%d')) && !additional_notice) ? 0 : -1
-      while (days_notice < booking_window.minimum_days_notice && date < end_date) do
-        date += 1.day
-        days_notice += 1 if business_days.include?(date.strftime('%Y-%m-%d'))
-        Rails.logger.info "Calculating start_date: #{date}, days_notice: #{days_notice}"
+  
+      # count only days with actual service slots
+      days_notice = (pattern_calendar[date.strftime('%Y-%m-%d')].any? && !additional_notice) ? 0 : -1
+      while (days_notice < booking_window.minimum_days_notice && start_date < end_date) do
+        start_date += 1.day
+        if pattern_calendar[start_date.strftime('%Y-%m-%d')].any?
+          days_notice += 1
+        end
+        Rails.logger.info "Calculating start_date: #{start_date}, days_notice: #{days_notice}"
       end
-
-      start_date = date
+  
+      start_date = start_date
       Rails.logger.info "Final start_date: #{start_date}"
-
-      Rails.logger.info "Before while loop for end_date calculation: date: #{date}, days_notice: #{days_notice}, end_date: #{end_date}, business_days: #{business_days}"
-
+  
+      Rails.logger.info "Before while loop for end_date calculation: date: #{start_date}, days_notice: #{days_notice}, end_date: #{end_date}, business_days: #{business_days}"
+  
+      # now extend end_date by counting only real service days
+      date = start_date
       while (days_notice < booking_window.maximum_days_notice && date < end_date) do
         date += 1.day
-        days_notice += 1 if business_days.include?(date.strftime('%Y-%m-%d'))
+        if pattern_calendar[date.strftime('%Y-%m-%d')].any?
+          days_notice += 1
+        end
         Rails.logger.info "Inside while loop: date: #{date}, days_notice: #{days_notice}, end_date: #{end_date}"
       end
-
+  
       Rails.logger.info "After while loop for end_date calculation: date: #{date}, days_notice: #{days_notice}, end_date: #{end_date}"
-
+  
       end_date = date
       Rails.logger.info "Final end_date: #{end_date}"
-
+  
       travel_pattern.to_api_response(start_date, end_date, valid_from, valid_until)
     }
     .select { |travel_pattern|
@@ -491,7 +501,7 @@ class TravelPattern < ApplicationRecord
         time_ranges.any? { |range| (range[:start_time] || -1) >= 0 && (range[:end_time] || -1) >= 1 }
       end
     }
-  end
+  end  
 
   # This method should be the first time we call the database, before this we were only constructing the query
   def self.filter_by_time(travel_pattern_query, trip_start, trip_end, date = nil)
