@@ -210,26 +210,65 @@ class TravelPattern < ApplicationRecord
   # TODO: verify whether the presence of a service schedule is good enough, or if it has to be a specific kind of schedule.
   validates_presence_of :name, :booking_window, :agency, :origin_zone, :destination_zone, :travel_pattern_funding_sources, :travel_pattern_purposes, :travel_pattern_service_schedules
 
-  def to_api_response(start_date, end_date, valid_from = nil, valid_until = nil)
-    travel_pattern_opts = { 
-      only: [:id, :agency_id, :name, :description]
+  def self.to_api_response(travel_patterns, service, valid_from = nil, valid_until = nil)
+    business_days = service.business_days
+  
+    # Filter out any patterns with no bookable dates. This can happen prior to selecting a date and time
+    # if a travel pattern has only calendar date schedules and the dates are outside of the booking window.
+    travel_patterns = [travel_patterns].flatten
+    travel_patterns.map { |travel_pattern|
+      booking_window    = travel_pattern.booking_window
+      additional_notice = service.localtime.hour >= booking_window.minimum_notice_cutoff_hour
+      date              = service.localtime.to_date
+  
+      start_date = date
+      end_date   = date + 60.days
+  
+      Rails.logger.info "Initial date: #{date}"
+      Rails.logger.info "Initial start_date: #{start_date}"
+      Rails.logger.info "Initial end_date: #{end_date}"
+  
+      # BUILD calendar once up through the max window
+      raw_end      = date + booking_window.maximum_days_notice.days
+      calendar_data = travel_pattern.to_calendar(date, raw_end, valid_from, valid_until)
+  
+      # count only days with actual service slots for minimum_notice
+      days_notice = (calendar_data[date.strftime('%Y-%m-%d')].any? && !additional_notice) ? 0 : -1
+      while (days_notice < booking_window.minimum_days_notice && start_date < raw_end) do
+        start_date += 1.day
+        if calendar_data[start_date.strftime('%Y-%m-%d')].any?
+          days_notice += 1
+        end
+        Rails.logger.info "Calculating start_date: #{start_date}, days_notice: #{days_notice}"
+      end
+  
+      Rails.logger.info "Final start_date: #{start_date}"
+  
+      Rails.logger.info "Before while loop for end_date calculation: date: #{start_date}, days_notice: #{days_notice}, end_date: #{end_date}, business_days: #{business_days}"
+  
+      # now count only days with slots for maximum_notice
+      date_iter = start_date
+      while (days_notice < booking_window.maximum_days_notice && date_iter < raw_end) do
+        date_iter += 1.day
+        if calendar_data[date_iter.strftime('%Y-%m-%d')].any?
+          days_notice += 1
+        end
+        Rails.logger.info "Inside while loop: date: #{date_iter}, days_notice: #{days_notice}, end_date: #{end_date}"
+      end
+  
+      Rails.logger.info "After while loop for end_date calculation: date: #{date_iter}, days_notice: #{days_notice}, end_date: #{end_date}"
+  
+      end_date = date_iter
+      Rails.logger.info "Final end_date: #{end_date}"
+  
+      travel_pattern.to_api_response(start_date, end_date, valid_from, valid_until)
     }
-    valid_from = Date.strptime(valid_from, '%Y-%m-%d') if valid_from.is_a?(String)
-    valid_until = Date.strptime(valid_until, '%Y-%m-%d') if valid_until.is_a?(String)    
-    start_date = [start_date, valid_from].compact.max if valid_from
-    end_date = [end_date, valid_until].compact.min if valid_until
-  
-    calendar_data = self.to_calendar(start_date, end_date, valid_from, valid_until)
-  
-    # Adjust the calendar data for serialization
-    adjusted_calendar_data = calendar_data.transform_values do |time_ranges|
-      # Transform each time range in the array into a serializable format, if necessary
-      time_ranges.map { |range| { start_time: range[:start_time], end_time: range[:end_time] } }
-    end
-  
-    self.as_json(travel_pattern_opts).merge({
-      "to_calendar" => adjusted_calendar_data
-    })
+    .select { |travel_pattern|
+      calendar_business_hours = travel_pattern["to_calendar"].values
+      calendar_business_hours.any? do |time_ranges|
+        time_ranges.any? { |range| (range[:start_time] || -1) >= 0 && (range[:end_time] || -1) >= 1 }
+      end
+    }
   end  
 
   def self.for_user(user)
