@@ -293,12 +293,43 @@ class TravelPattern < ApplicationRecord
   #   :calendar_length => +start_date+ + 59.days
   # 
   # @return [Hash] The structure is {"%Y-%m-%d" => { start_time: +Integer+, end_time: +Integer+ }}
-  def to_calendar(start_date, end_date = start_date + 59.days, valid_from = nil, valid_until = nil)
+  def to_calendar(start_date, end_date = nil, valid_from = nil, valid_until = nil)
+    max_days = booking_window.maximum_days_notice
+
     travel_pattern_service_schedules = schedules_by_type
   
     weekly_schedules = travel_pattern_service_schedules[:weekly_schedules].map(&:service_schedule)
     extra_service_schedules = travel_pattern_service_schedules[:extra_service_schedules].map(&:service_schedule)
     reduced_service_schedules = travel_pattern_service_schedules[:reduced_service_schedules].map(&:service_schedule)
+
+    service_days_count = 0
+    date_iter = start_date
+
+    while service_days_count < max_days
+      has_holiday = reduced_service_schedules.any? do |ss|
+        (ss.start_date.nil? || ss.start_date <= date_iter) &&
+        (ss.end_date.nil?   || ss.end_date   >= date_iter) &&
+        ss.service_sub_schedules.any? { |sub| sub.calendar_date == date_iter && sub.start_time.nil? && sub.end_time.nil? }
+      end
+
+      unless has_holiday
+        slots = (weekly_schedules + extra_service_schedules).flat_map do |ss|
+          next unless (ss.start_date.nil? || ss.start_date <= date_iter) &&
+                      (ss.end_date.nil?   || ss.end_date   >= date_iter)
+
+          ss.service_sub_schedules.select do |sub|
+            (sub.day == date_iter.wday || sub.calendar_date == date_iter) &&
+            !(sub.start_time.nil? && sub.end_time.nil?)
+          end
+        end.compact
+
+        service_days_count += 1 if slots.any?
+      end
+
+      date_iter += 1.day
+    end
+
+    end_date = date_iter - 1.day
   
     calendar = {}
     date = start_date
@@ -306,7 +337,7 @@ class TravelPattern < ApplicationRecord
     while date <= end_date
       date_string = date.strftime('%Y-%m-%d')
       calendar[date_string] = []
-      
+
       has_holiday = false
   
       # Check reduced service schedules for holidays (nil start and end times)
