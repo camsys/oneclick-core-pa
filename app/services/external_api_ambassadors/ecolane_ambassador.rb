@@ -269,7 +269,7 @@ class EcolaneAmbassador < BookingAmbassador
         created_in_1click: booking.created_in_1click,
         funding_source: initial_funding_source || funding_hash[:funding_source],
         purpose: initial_purpose || funding_hash[:purpose],
-        booking_id: booking.id,
+        booking_id: booking.confirmation,
         traveler: itinerary.user.email,
         orig_addr: trip.origin.formatted_address,
         orig_lat: trip.origin.lat,
@@ -931,8 +931,6 @@ class EcolaneAmbassador < BookingAmbassador
     rescue REXML::ParseException
       nil
     end
-
-    Rails.logger.info "[EcolaneAmbassador] build_order purpose=#{order_hash.dig(:funding, :purpose) || order_hash.dig(:funding, 'purpose')}"
 
   end
   
