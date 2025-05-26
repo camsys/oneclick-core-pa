@@ -370,30 +370,34 @@ class EcolaneAmbassador < BookingAmbassador
       return false
     end
 
-    url_options = "/api/order/#{system_id}/#{@confirmation}"
-    url = @url + url_options
+    url = "#{@url}/api/order/#{system_id}/#{@confirmation}"
+    Rails.logger.debug "Ecolane CANCEL DELETE #{url} at #{Time.current.iso8601}"
+
     resp = send_request(url, 'DELETE')
+    Rails.logger.debug "Ecolane CANCEL raw response: #{resp.inspect}"
 
     begin
       resp_code = resp.code
-    rescue
+      Rails.logger.debug "Ecolane CANCEL HTTP code: #{resp_code}"
+    rescue => e
+      Rails.logger.error "Ecolane CANCEL error reading response code: #{e.message}"
       return false
     end
 
     if resp_code == "200"
-      Rails.logger.debug "Trip #{@confirmation} canceled."
-      #The trip was successfully canceled
+      Rails.logger.debug "Ecolane CANCEL Trip #{@confirmation} canceled via API."
       true
-    elsif status == 'canceled'
-      Rails.logger.debug "Trip #{@confirmation}  already canceled."
-      #The trip was not successfully deleted, because it was already canceled
-      return true
+    elsif status(@confirmation) == 'canceled'
+      Rails.logger.debug "Ecolane CANCEL Trip #{@confirmation} already in 'canceled' state."
+      true
     else
-      Rails.logger.debug "Trip #{@confirmation}  cannot be canceled."
-      #The trip is not canceled
+      current_status = status(@confirmation)
+      if current_status == 'dispatch'
+        Rails.logger.warn  "Ecolane CANCEL Trip #{@confirmation} in 'dispatch' status after cancel attempt."
+      end
+      Rails.logger.debug "Ecolane CANCEL Trip #{@confirmation} cancel failed: HTTP #{resp_code}; status now=#{current_status.inspect}"
       false
     end
-
   end
 
   def get_ecolane_fare
