@@ -933,7 +933,6 @@ class EcolaneAmbassador < BookingAmbassador
     end
 
     Rails.logger.info "[EcolaneAmbassador] build_order purpose=#{order_hash.dig(:funding, :purpose) || order_hash.dig(:funding, 'purpose')}"
-    Rails.logger.info "[EcolaneAmbassador] build_order funding_source=#{order_hash.dig(:funding, :funding_source) || order_hash.dig(:funding, 'funding_source')}"
 
   end
   
