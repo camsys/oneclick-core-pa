@@ -10,7 +10,7 @@ module Api
       # Returns past trips associated with logged in user, limit by max_results param
       def past_trips
         past_trips_with_booking = @traveler.past_trips(params[:max_results] || 25).select do |trip|
-          trip.booking.present? && trip.booking.confirmation.present?
+          trip.booking.present? && trip.booking.confirmation.present? && trip.booking.status != 'noshow' 
         end
 
         trip_ids = {}
@@ -43,6 +43,8 @@ module Api
           if trip.booking.nil?
             next
           elsif trip.booking.confirmation.nil?
+            next
+          elsif trip.booking.status == 'noshow'
             next
           else
             true
@@ -529,7 +531,7 @@ module Api
             end
           end
           if departure.nil? and itinerary.start_time 
-            departure = itinerary.start_time
+            # departure = itinerary.start_time   # removed per FMRPA-318
           end
 
           # End Time 
@@ -542,7 +544,7 @@ module Api
             end
           end
           if arrival.nil?
-            arrival = itinerary.end_time
+            # arrival = itinerary.end_time       # removed per FMRPA-318
           end
 
           # Calculate Duration 
@@ -554,18 +556,18 @@ module Api
               duration = itinerary.booking.negotiated_do - departure 
             end
           end
-          if duration.nil?
-            duration = itinerary.duration 
-          end
+          # if duration.nil?
+          #   duration = itinerary.duration      # removed per FMRPA-318
+          # end
 
           itinerary_hash = {
             assistant: itinerary.assistant,
-            arrival: arrival ? arrival.strftime("%Y-%m-%dT%H:%M") : nil,
+            arrival: arrival ? arrival.strftime("%Y-%m-%dT%H:%M") : 'N/A',
             booking_confirmation: itinerary.booking_confirmation,
             comment: nil, # DEPRECATE? in old OneClick, this just takes the English comment
             companions: itinerary.companions,
             cost: itinerary.cost.to_f,
-            departure: departure ? departure.strftime("%Y-%m-%dT%H:%M") : nil,
+            departure: departure ? departure.strftime("%Y-%m-%dT%H:%M") : 'N/A',
             duration: duration,
             fare: itinerary.cost.to_f,
             id: itinerary.id,
@@ -583,7 +585,7 @@ module Api
             wait_start: itinerary.booking ? itinerary.booking.earliest_pu : nil,
             pu_window_end: itinerary.booking ? itinerary.booking.latest_pu : nil,
             wait_end: itinerary.booking ? itinerary.booking.latest_pu : nil,
-            estimated_pickup_time: departure ? departure.strftime("%Y-%m-%dT%H:%M") : nil
+            estimated_pickup_time: departure ? departure.strftime("%Y-%m-%dT%H:%M") : 'N/A'
           }
         end
         itinerary_hash
