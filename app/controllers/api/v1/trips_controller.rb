@@ -156,19 +156,31 @@ module Api
             return render(status: 404, json: origin_place) unless Landmark.place_exists?(origin_place)
             return render(status: 404, json: destination_place) unless Landmark.place_exists?(destination_place)
 
-            existing_trip = Trip.where(trip_time: trip_param[:trip_time],
-                                        arrive_by: trip_param[:arrive_by],
-                                        user_id: trip_param[:user_id],
-                                        selected_itinerary_id: nil)
-                                .order(updated_at: :desc)
-                                .detect { |trip|
-                                  trip.origin.lat.to_f.round(6) == origin_place[:lat].to_f.round(6) &&
-                                  trip.origin.lng.to_f.round(6) == origin_place[:lng].to_f.round(6) &&
-                                  trip.destination.lat.to_f.round(6) == destination_place[:lat].to_f.round(6) &&
-                                  trip.destination.lng.to_f.round(6) == destination_place[:lng].to_f.round(6)
-                                }
-            
-            existing_trip ? existing_trip : Trip.create!(trip_param)
+            existing_trip = Trip.where(trip_time:  trip_param[:trip_time],
+            arrive_by:   trip_param[:arrive_by],
+            user_id:     trip_param[:user_id],
+            selected_itinerary_id: nil)
+                .order(updated_at: :desc)
+                .detect do |trip|
+                  trip.origin.lat.to_f.round(6)  == origin_place[:lat].to_f.round(6)  &&
+                  trip.origin.lng.to_f.round(6)  == origin_place[:lng].to_f.round(6)  &&
+                  trip.destination.lat.to_f.round(6) == destination_place[:lat].to_f.round(6) &&
+                  trip.destination.lng.to_f.round(6) == destination_place[:lng].to_f.round(6)
+                end
+
+            if existing_trip
+            new_purpose = trip_param[:external_purpose]
+            if new_purpose && existing_trip.external_purpose != new_purpose
+            existing_trip.update(
+            external_purpose: new_purpose,
+            purpose_id:       trip_param[:purpose_id]
+            )
+            end
+            existing_trip
+            else
+            Trip.create!(trip_param)
+            end
+
           end.sort_by{ |t| t.trip_time }
 
           # Now that trips have either been found or created, it's time to make sure they're up to date
