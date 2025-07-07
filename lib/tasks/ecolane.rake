@@ -4,6 +4,9 @@ namespace :ecolane do
   task :update_pois => :environment do
     start_time = Time.now
 
+    summary_messages = []
+    error_messages = []
+
     # Check to see if another instance is already running
     is_already_running = false
     task_run_state = Config.find_or_create_by key: 'ecolane_task_is_running'
@@ -15,14 +18,14 @@ namespace :ecolane do
         puts "Another task instance is already running. Exiting."
         exit
       else
+        is_already_running = false
         task_run_state.value = true
         task_run_state.save!
+        task_run_state.touch
         puts "Running this instance."
       end
     end
     
-    summary_messages = []
-    error_messages = []
     local_error = false
     domain = ENV['MAIL_HOST'] || 'unknown domain'
 
@@ -136,7 +139,7 @@ namespace :ecolane do
         error_messages << "Error loading POIs for System: #{system}. #{e.message}. (Domain: #{domain})"
         local_error = true
         # Log if errors happen
-        puts messages.to_s
+        puts error_messages.to_s
         next
       end
 
