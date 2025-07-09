@@ -407,13 +407,17 @@ class EcolaneAmbassador < BookingAmbassador
   def get_1click_fare funding_hash=nil
     url_options =  "/api/order/#{system_id}/queryfare"
     url = @url + url_options
+    Rails.logger.debug "Funding hash before: #{funding_hash}"
     
     if funding_hash && !funding_hash.empty?
+      Rails.logger.debug "Funding hash populated"
       order = build_order(true, funding_hash)
     else
+      Rails.logger.debug "Funding hash NOT populated"
       order = build_order 
     end
     # err on new qa is response didn't finish building
+    Rails.logger.debug "Order: #{order}"
     resp = send_request(url, 'POST', order)
     return nil if resp.code != "200"
     resp = Hash.from_xml(resp.body) || {}
@@ -463,9 +467,12 @@ class EcolaneAmbassador < BookingAmbassador
   ##### 
   ## Send the Requests
   def send_request(url, type='get', message=nil)
+    Rails.logger.debug "Message before: #{message}"
     if message 
       message = Nokogiri::XML(message).to_s
     end
+
+    Rails.logger.debug "Message after: #{message}"
   
     url.sub! " ", "%20"
     begin
@@ -906,6 +913,8 @@ class EcolaneAmbassador < BookingAmbassador
     @booking_options[:companions] ||= itin&.companions
     @booking_options[:note] ||= itin&.note
 
+    Rails.logger.debug "Itin details: #{itin}\nBooking options: #{@booking_options}"
+
     @trip.reload
     pickup_hash = build_pu_hash
     pickup_hash[:note] = @booking_options[:note]
@@ -931,6 +940,7 @@ class EcolaneAmbassador < BookingAmbassador
         order_hash[:funding] = {purpose: @purpose}
       end
 
+      Rails.logger.debug "Order hash: #{order_hash}"
       order_hash.to_xml(root: 'order', :dasherize => false)
     rescue REXML::ParseException
       nil
