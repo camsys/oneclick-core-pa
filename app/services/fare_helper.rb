@@ -78,9 +78,11 @@ module FareHelper
     def calculate_use_booking_service
       case @service.booking_api
       when "ecolane"
+        Rails.logger.debug "Options: #{options}"
         booking_options = {}
         booking_options[:companions] = options[:companions] if options[:companions].to_i > 0
         booking_options[:assistant] = options[:assistant] if options[:assistant].to_bool
+        Rails.logger.debug "Booking options: #{booking_options}"
         EcolaneAmbassador.new({trip: @trip, service: @service, booking_options: booking_options}).get_fare #TODO: Improve performance by using the request bundler
       end 
     end

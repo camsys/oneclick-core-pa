@@ -913,7 +913,10 @@ class EcolaneAmbassador < BookingAmbassador
     @booking_options[:companions] ||= itin&.companions
     @booking_options[:note] ||= itin&.note
 
-    Rails.logger.debug "Itin details: #{itin}\nBooking options: #{@booking_options}"
+    Rails.logger.debug "Self itinerary: #{self.itinerary.inspect}"
+    Rails.logger.debug "Selected itinerary: #{@trip.selected_itinerary.inspect}"
+    Rails.logger.debug "First itinerary: #{@trip.itineraries.first.inspect}"
+    Rails.logger.debug "Assigned itin details: #{itin.inspect}\nBooking options: #{@booking_options}"
 
     @trip.reload
     pickup_hash = build_pu_hash

@@ -302,6 +302,7 @@ class TripPlanner
                               trip_type: :paratransit,
                               trip_id: @trip.id
                             )
+      Rails.logger.debug "Itinerary options: #{@options}"
 
       # Whether an itinerary was found, or initialized, we need to update it
       itinerary.assign_attributes({
