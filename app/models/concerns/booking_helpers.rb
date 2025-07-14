@@ -142,11 +142,14 @@ module BookingHelpers
     # itinerary is selected or passed. Booking options may be passed as a hash.
     # It is useful to book using this method for debugging, as errors will be stored on the trip
     def book(itinerary=nil, opts={})
+      Rails.logger.debug "\nTripHelpers book(itinerary = #{itinerary.inspect}, opts = #{opts.inspect}"
       itinerary_to_book = itineraries.find_by(id: itinerary.try(:id)) || selected_itinerary
       if itinerary_to_book.present? 
         itinerary_to_book.select
+        Rails.logger.debug "Itinerary to book selected. Booking through ambassador."
         return booking_ambassador(opts).book
       else
+        Rails.logger.debug "Itinerary to book not present"
         return false
       end
     end
@@ -175,6 +178,7 @@ module BookingHelpers
     
     # Books this itinerary
     def book(opts={})
+      Rails.logger.debug "\nItinerary helpers book(options=#{opts.inspect})"
       booking_ambassador(opts).book
     end
     

@@ -145,8 +145,11 @@ class EcolaneAmbassador < BookingAmbassador
 
     # Books Trip (funding_source and sponsor must be specified)
   def book
+    Rails.logger.debug "\nEcolaneAmbassador book"
     booking = new_order
+    Rails.logger.debug "\nBooking after new_order: #{booking.inspect}"
     sync
+    Rails.logger.debug "\nBooking after sync: #{booking.inspect}"
     booking
   end
 
@@ -188,6 +191,7 @@ class EcolaneAmbassador < BookingAmbassador
   ####################################################################
 
   def new_order
+    Rails.logger.debug "\nEcolaneAmbassador new_order"
     url_options = "/api/order/#{system_id}?overlaps=reject"
     url = @url + url_options
     begin
