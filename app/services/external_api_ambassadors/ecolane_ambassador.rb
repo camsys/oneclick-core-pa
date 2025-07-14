@@ -918,8 +918,8 @@ class EcolaneAmbassador < BookingAmbassador
     Rails.logger.debug "First itinerary: #{@trip.itineraries.first.inspect}\n"
     Rails.logger.debug "Assigned itin details: #{itin.inspect}\nBooking options: #{@booking_options}\n"
     Rails.logger.debug "All trip itineraries:"
-    @trip.itineraries.each_with_index do |itin, i|
-      Rails.logger.debug "Itinerary #{i+1}: #{itin.inspect}\n"
+    @trip.itineraries.each_with_index do |itinerary, i|
+      Rails.logger.debug "Itinerary #{i+1}: #{itinerary.inspect}\n"
     end
 
     @trip.reload

@@ -236,21 +236,29 @@ module Api
         itins  = []
         #########################################################################
 
+        Rails.logger.debug "\nBooking request params: #{booking_request_params}\n"
         responses = booking_request_params.map do |booking_request|
+          Rails.logger.debug "\nBooking request: #{booking_request.inspect}\n"
           # Find the itinerary identified in the booking request
           itin = Itinerary.find_by(id: booking_request.delete(:itinerary_id))
+          Rails.logger.debug "\n\itin: #{itin.inspect}\n"
           itin.try(:select) # Select the itinerary so that the return trip can be built properly
           booking_request[:itinerary] = itin
+          Rails.logger.debug "\nBooking request itinerary = itin?: #{itin && (booking_request[:itinerary] == itin)}\n"
           next booking_request unless itin
           
           # If a return_time param was passed, build a return itinerary
           return_time = booking_request.delete(:return_time).try(:to_datetime)
           if return_time
+            Rails.logger.debug "\nReturn time: #{return_time}"
             return_itin = ReturnTripPlanner.new(itin.trip, {trip_time: return_time})
                           .plan.try(:selected_itinerary)
+            Rails.logger.debug "\nReturn itin: #{return_itin.inspect}"
             return_booking_request = booking_request.clone.merge({itinerary: return_itin, return: true})
+            Rails.logger.debug "\nReturned from booking request -- [booking request: #{booking_request.inspect}, return booking request: #{return_booking_request.inspect}]"
             next [booking_request, return_booking_request]
           else
+            Rails.logger.debug "\nReturned from booking request -- booking request: #{booking_request.inspect}"
             next booking_request
           end
         end.flatten.compact # flatten into an array of booking requests
@@ -258,58 +266,72 @@ module Api
           # Pull the itinerary out of the booking_request hash and set up a
           # default (failure) booking response
           itin = booking_request.delete(:itinerary) 
-          itins << itin       
+          itins << itin
+          Rails.logger.debug "\nItin added to itins: #{itin.inspect}"
 
           response = booking_response_base(itin).merge({booked: false})
+          Rails.logger.debug "\nResponse: #{response.inspect}"
                                         
           # BOOK THE ITINERARY, selecting it and storing the response in a booking object
           if itin.booked?
             # This itinerary has already been booked. Don't book it again.
+            Rails.logger.debug "\nItinerary has already been booked."
             next response.merge(booking_response_hash(itin.booking))
           end
 
           booking = itin.try(:book, booking_options: booking_request)
           unless booking.is_a?(Booking)
+            Rails.logger.debug "\nBooking not present (or isn't a Booking object)."
             failed = true
             next response 
           end
 
           # Ensure that the confirmation is not blank
           if booking.confirmation.blank?
+            Rails.logger.debug "\nBooking confirmation is blank."
             failed = true
             next response 
           end
           #next response unless booking.is_a?(Booking) # Return failure response unless book was successful
 
           # Update Trip Disposition Status to ecolane succeeded
+          Rails.logger.debug "\nUpdating trip disposition to ecolane booked"
           itin.trip.update(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_booked])
+          Rails.logger.debug "Updating booking snapshot disposition to ecolane booked"
           itin.trip.ecolane_booking_snapshot.update(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_booked])      
           # Package it in a response hash as per API V1 docs
+          Rails.logger.debug "Returning response merged with booking response hash\n"
           next response.merge(booking_response_hash(booking))
         end
         
         # If any of the itineraries failed, cancel them all and return failures
         if failed
+          Rails.logger.debug "\nOne or more itineraries failed."
           responses = []
           itins.each do |itin|
+            Rails.logger.debug "Itinerary being #{itin.booked? ? "cancelled" : "unselected"}: #{itin.inspect}\n"
             itin.booked? ? itin.cancel : itin.unselect
         
             # Check if the return trip is denied and the first trip was successful
             if itin.trip.next_trip.present? && itin.trip.next_trip.disposition_status == Trip::DISPOSITION_STATUSES[:ecolane_denied]
+              Rails.logger.debug "Return trip was denied."
               # Check if the first trip was successfully booked; if so, mark it as cancelled due to round trip failure
               if itin.trip.disposition_status == Trip::DISPOSITION_STATUSES[:ecolane_booked]
                 itin.trip.update(disposition_status: Trip::DISPOSITION_STATUSES[:cancelled_round_trip_booking_denial])
+                Rails.logger.debug "First trip cancelled due to round trip failure."
               end
         
               # Also update the return trip's status to ecolane_denied if not already done
               itin.trip.next_trip.update(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_denied])
-        
+              Rails.logger.debug "Return trip's status set to denied."
             else
               # If both trips fail, keep the first trip's status as ecolane_denied
               itin.trip.update(disposition_status: Trip::DISPOSITION_STATUSES[:ecolane_denied])
+              Rails.logger.debug "First trip's status set to denied."
             end
         
             responses << booking_response_base(itin).merge({booked: false})
+            Rails.logger.debug "\nResponses after failure: #{responses.inspect}"
           end
           render status: 500, json: {booking_results: responses}
         else
