@@ -196,11 +196,12 @@ class EcolaneAmbassador < BookingAmbassador
     url = @url + url_options
     begin
       order = build_order
-      Rails.logger.info "Order: #{order}"
+      Rails.logger.info "\n\nSending order: #{order.inspect}"
       resp = send_request(url, 'POST', order)
       # NOTE: this seems like overkill, but Ecolane uses both JSON and
       # ...XML for their responses, and failed responses are formatted as JSON
       body_hash = Hash.from_xml(resp.body)
+      Rails.logger.info "\nBody hash from response: #{body_hash.inspect}"
 
       # Getting the initial values from the order for the snapshot
       order_hash = Hash.from_xml(order)
@@ -944,10 +945,13 @@ class EcolaneAmbassador < BookingAmbassador
     end
     begin
       if funding_hash && !funding_hash.empty?
+        Rails.logger.debug "Funding hash present: #{funding_hash.inspect}"
         order_hash[:funding] = funding_hash
       elsif funding
+        Rails.logger.debug "Funding hash not present, but funding is. Getting hash."
         order_hash[:funding] = get_funding_hash
       elsif @purpose
+        Rails.logger.debug "Funding/hash not present. Using purpose."
         order_hash[:funding] = {purpose: @purpose}
       end
 
