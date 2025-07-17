@@ -138,6 +138,10 @@ class Admin::ReportsController < Admin::AdminController
           snapshots = snapshots.where(purpose: purpose_names)
         end
       end
+      Rails.logger.debug "\nSnapshots for report:"
+      snapshots.each_with_index do |s,i|
+        Rails.logger.debug "Snapshot #{i}: #{s.inspect}\n"
+      end
   
     respond_to do |format|
       format.csv { send_data snapshots.to_csv(with: Admin::BookingSnapshotsReportCSVWriter) }

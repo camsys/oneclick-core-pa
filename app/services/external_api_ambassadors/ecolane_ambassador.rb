@@ -253,12 +253,14 @@ class EcolaneAmbassador < BookingAmbassador
       booking = self.booking
       trip = itinerary.trip || self.trip
       funding_hash = booking.details.fetch(:funding_hash, {})
+      Rails.logger.debug "\nBooking used for snapshot: #{booking.inspect}"
+      Rails.logger.debug "\nEco trip used for snapshot: #{eco_trip.inspect}"
 
       new_snapshot = EcolaneBookingSnapshot.new(
         trip_id: trip.id,
         itinerary_id: itinerary.id,
         status: eco_trip.try(:with_indifferent_access).try(:[], :status),
-        confirmation: eco_trip.try(:with_indifferent_access).try(:[], :id),
+        confirmation: booking.confirmation,
         details: eco_trip ? eco_trip.to_json : nil,
         earliest_pu: booking.earliest_pu,
         latest_pu: booking.latest_pu,
@@ -269,7 +271,7 @@ class EcolaneAmbassador < BookingAmbassador
         created_in_1click: booking.created_in_1click,
         funding_source: initial_funding_source || funding_hash[:funding_source],
         purpose: initial_purpose || funding_hash[:purpose],
-        booking_id: booking.confirmation,
+        booking_id: booking.id,
         traveler: itinerary.user.email,
         orig_addr: trip.origin.formatted_address,
         orig_lat: trip.origin.lat,
