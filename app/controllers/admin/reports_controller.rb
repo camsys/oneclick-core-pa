@@ -139,8 +139,8 @@ class Admin::ReportsController < Admin::AdminController
         end
       end
       Rails.logger.debug "\nSnapshots for report:"
-      snapshots.each do |s,i|
-        Rails.logger.debug "Snapshot #{i}: #{s.inspect}"
+      snapshots.each_with_index do |s,i|
+        Rails.logger.debug "Snapshot #{i}: #{s.inspect}\n"
       end
   
     respond_to do |format|
