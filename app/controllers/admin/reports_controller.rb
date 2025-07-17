@@ -136,6 +136,10 @@ class Admin::ReportsController < Admin::AdminController
         unless @purposes.empty?
           purpose_names = Purpose.where(id: @purposes).pluck(:name)
           snapshots = snapshots.where(purpose: purpose_names)
+          Rails.logger.debug "\nSnapshots for report:"
+          snapshots.each do |s,i|
+            Rails.logger.debug "Snapshot #{i}: #{s.inspect}"
+          end
         end
       end
   

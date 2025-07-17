@@ -54,7 +54,7 @@ module Admin
     end
 
     def booking_id
-      @record.booking_id || 'No Booking ID'
+      @record.confirmation || 'No Booking ID'
     end
 
     def booking_client_id
