@@ -10,7 +10,7 @@ module Api
       # Returns past trips associated with logged in user, limit by max_results param
       def past_trips
         past_trips_with_booking = @traveler.past_trips(params[:max_results] || 25).select do |trip|
-          trip.booking.present? && trip.booking.confirmation.present? && trip.booking.status != 'noshow' 
+          trip.booking.present? && trip.booking.confirmation.present? && trip.booking.status.strip != 'noshow' 
         end
 
         trip_ids = {}
@@ -44,7 +44,7 @@ module Api
             next
           elsif trip.booking.confirmation.nil?
             next
-          elsif trip.booking.status == 'noshow'
+          elsif trip.booking.status.strip == 'noshow'
             next
           else
             true
